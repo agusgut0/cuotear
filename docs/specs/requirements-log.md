@@ -150,7 +150,7 @@ Source: internal coherence review of DAF v0.2 (DAF now v0.3). Facts below marked
 | 3 | Run state (last valid measurement timestamp, failure counters, pending alerts, last valid config, previous best option, last run time) lives outside commits (e.g. Actions cache); the site is deployed from the workflow without commits; commit only when history points change; zero commits otherwise; behaviour if state is lost defined. | S-25 |
 | 4 | Mercado Libre: only a price is guaranteed (stored as list price; cash and cards "sin datos" unless obtainable); product must be in the MejoresCompras catalog (absent: "sin datos", no failure, no counter); daily snapshot so ML is queried once a day. | S-27, S-32 |
 | 5 | RF-04 list may shrink after the R-01 spike or by RNF-07; criterion evaluated against the current list. | S-28 |
-| 6 | RNF-12: stores run in parallel; RNF-01 budget includes validation CI and site build (<= 1,500 min/month). | S-29 |
+| 6 | RNF-12: stores run in parallel so the worst case fits the 10-min per-run timeout. (Superseded in Round 9: no monthly minutes budget.) | S-29 |
 | 7 | Failed, "sin datos", out-of-stock and closed series are excluded from best option and verdict; changes caused by exclusion, recovery, or by r/s/config do not alert. | S-26 |
 | 8 | "Aviso operativo" defined once (RNF-15); missing secrets: no send, notice, rest continues (RF-23 and S-18 now consistent). | S-18 |
 | 11-13 | Missing rows added (8.2); section 13 maps V2-01, ALT-01, R-01; RN-04 consistent (absorbed into RF-02); RF-03 added to CU-05, CU-08, CU-09 and coverage claim fixed. | - |
@@ -167,3 +167,9 @@ Source: internal coherence review of DAF v0.2 (DAF now v0.3). Facts below marked
 | 25 | Header no longer claims rounds 1-5 are all confirmed. | - |
 | 26 | RF-07 criterion testable (no "active" flag; to stop measuring a URL, remove it); RN-08 criterion for n changes (old series closed, new one opens without alert). | S-24, S-33 |
 | 27 | Above 50 MB keep recording (soft); at 100 MB stop persisting points; removed products leave active files at next run. | S-33 |
+
+## Round 9 - Actions budget correction
+
+| ID | Requirement | Source | Status |
+|----|-------------|--------|--------|
+| RNF-01 | Public repo + standard runners = free Actions minutes, so there is no monthly minutes budget (the 1,500 min/month figure from Round 8 is dropped). The relevant limit is the per-run timeout (<= 10 min, `timeout-minutes`). If the repo became private, re-evaluate the minutes quota. | User instruction (2026-11-22) | confirmed |

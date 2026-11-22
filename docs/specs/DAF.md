@@ -304,7 +304,7 @@ El historial de precios (por producto, tienda y serie: contado, o tarjeta + n; y
 
 | ID | Requisito (medible) | Estado | Criterio de aceptación |
 |---|---|---|---|
-| RNF-01 | Arquitectura serverless de costo cero: GitHub Actions + GitHub Pages (impuesta). Costo mensual = USD 0; sin servicios externos de pago ni backend propio. Presupuesto de minutos (S-15, S-29): ejecución completa (medición, historial, construcción del sitio) ≤ 10 min × 120 ejecuciones/mes = ≤ 1.200 min, más CI de validación ≤ 300 min/mes; **total ≤ 1.500 min/mes**. | Confirmada (costo cero); presupuesto: **Supuesto** | Dado un mes de operación, entonces no hay cargos y la suma de minutos de relevamiento + construcción del sitio + CI de validación ≤ 1.500 (**a verificar** contra la capa gratuita vigente). |
+| RNF-01 | Arquitectura serverless de costo cero: GitHub Actions + GitHub Pages (impuesta). Costo mensual = USD 0; sin servicios externos de pago ni backend propio. Con el repo público, los runners estándar de GitHub Actions no consumen cuota de minutos (gratis), por lo que **no se define un presupuesto mensual de minutos**; el límite relevante es el **timeout por ejecución** (S-15, S-29): ejecución completa (medición, historial, construcción del sitio) ≤ 10 min, aplicado como `timeout-minutes` del job. | Confirmada (costo cero); runners gratuitos por repo público y timeout de 10 min: **Supuesto** | Dado un mes de operación con el repo público y runners estándar, entonces no hay cargos y ninguna ejecución supera 10 min (el job se corta por timeout). Si el repo pasara a privado, entonces hay que reevaluar la cuota de minutos (**a verificar** contra las condiciones vigentes de GitHub). |
 | RNF-03 | Idiomas de la UI: es-AR (por defecto) y en; el 100 % de las cadenas visibles existe en ambos. Las condiciones de contado se generan desde datos estructurados (RF-20). | Confirmada | Dado el cambio de idioma, entonces ninguna cadena queda sin traducir (incluidas las condiciones de contado); sin preferencia previa se muestra es-AR. |
 | RNF-06 | Precios en ARS con marca de tiempo de cada medición; la UI muestra "actualizado a las…" en horario de Argentina, generada al construir el sitio (no versionada, sección 9). También el valor de inflación usado y su fecha. | **Supuesto** S-22 | Dado un producto, entonces cada precio muestra fecha/hora de su última medición válida. Dado una ejecución sin cambios de historial, entonces "actualizado a las…" refleja igualmente esa ejecución sin generar commit. |
 | RNF-07 | Respeto a ToS/robots en lo factible: máx. 1 pedido/seg por dominio (S-03), User-Agent identificable, sin evadir protecciones anti-bot; tiendas que lo prohíban se retiran (RF-04, S-28). | **Supuesto** | Dado un bloqueo anti-bot (captcha, 403), entonces se trata como falla (RF-15) y no se intenta evadirlo. |
@@ -344,7 +344,7 @@ Política de historial y de estado (S-13, S-25):
 | MejoresCompras (https://mejorescompras.com.ar/) | Fuente de precios de Mercado Libre (no se consulta ML directamente). **Best-effort**; solo precio garantizado; snapshot diario; catálogo de ~42.000 productos elegidos por ellos. | RF-04, Q-01 | Método y ToS a revisar; depende de un tercero; el producto puede no estar en el catálogo; puede dejar de funcionar sin aviso |
 | Telegram Bot API / email | Envío de alertas | RF-23 | Límites de mensaje, entregabilidad del email, secretos mal configurados |
 | BCRA REM (u otra fuente) | Inflación mensual esperada | RF-21 | Formato/disponibilidad no verificados; ver fallback en RF-21 |
-| GitHub Actions / GitHub Pages / issues | Planificación, relevamiento, commits de historial, estado, hosting del sitio y avisos operativos | RNF-01, RF-07, RF-24, RNF-15 | Demoras del cron, cuota de minutos, suspensión del cron por inactividad, expiración de la caché de estado |
+| GitHub Actions / GitHub Pages / issues | Planificación, relevamiento, commits de historial, estado, hosting del sitio y avisos operativos | RNF-01, RF-07, RF-24, RNF-15 | Demoras del cron, timeout por ejecución, suspensión del cron por inactividad, expiración de la caché de estado |
 
 ### Riesgos principales
 
@@ -443,7 +443,7 @@ Diferencial de cuotear: compara contado vs cuotas por tarjeta con veredicto a va
 | RN-04 | **Superseded (absorbida)** | Su idea (el límite cuenta productos, no URLs) se absorbe en RF-02; no pasa a v2 (sección 3 lo aclara). |
 | RN-05 | **Superseded** | Contado = lista: reemplazado por RN-10. |
 | RN-07 | **Superseded** | Confirmación de coincidencias: no hay coincidencia automática (v2). |
-| RNF-01, RNF-03, RNF-06, RNF-07, RNF-08, RNF-10, RNF-11 | Mantenidos | RNF-01 con presupuesto de minutos medible; RNF-11 confirmada (CLAUDE.md). |
+| RNF-01, RNF-03, RNF-06, RNF-07, RNF-08, RNF-10, RNF-11 | Mantenidos | RNF-01 con timeout por ejecución medible (sin presupuesto mensual: repo público); RNF-11 confirmada (CLAUDE.md). |
 | RNF-02 | **Superseded** | Backend externo: no hay escritura desde la UI. |
 | RNF-04 | **Superseded** | Privacidad/borrado de cuenta/Ley 25.326: sin datos personales (RNF-14). Retención de 12 meses se conserva en RNF-13. |
 | RNF-05 | **Superseded** | Anti-abuso multiusuario: no aplica. |
@@ -510,7 +510,7 @@ Cobertura de casos de uso: todo RF vigente (RF-01 a RF-05, RF-07, RF-14, RF-15, 
 | S-12 | Se conserva la última configuración válida si la nueva falla (también con 11 productos); una URL por tienda por producto; URL duplicada rechazada. | RF-19, RF-02 |
 | S-13 | Historial: punto solo ante cambios; un commit por ejecución solo si hay cambios de historial; retención 12 meses conservando el último punto de cada serie; advertencia a 45 MB, límite blando 50 MB; archivos por producto. | RF-24, RNF-13 |
 | S-14 | El sitio y el repo son públicos; sin datos personales. | RNF-14, sección 9 |
-| S-15 | Consumo de Actions: ≤ 10 min por ejecución (incluye construcción del sitio). | RNF-01 |
+| S-15 | Límite por ejecución: ≤ 10 min (`timeout-minutes`; incluye construcción del sitio). Repo público con runners estándar: minutos gratis, sin presupuesto mensual. | RNF-01 |
 | S-16 | Umbral "a verificar" estrictamente mayor a 90 %. | RN-13 |
 | S-17 | Mercado Libre es best-effort: su falla no cuenta contra RNF-10. | RF-04, RNF-10 |
 | S-18 | **Aviso operativo** definido una sola vez (RNF-15): log/resumen + issue `cuotear-ops` (uno abierto por causa), sin fallar la ejecución ni depender de los secretos del canal. Se emite si todas las tiendas fallan, faltan secretos del canal (RF-23: no se envía, se avisa y el resto continúa), configuración inválida o historial ≥ 45 MB. | RNF-15, RNF-12, RNF-13, RF-23, RF-19, R-04 |
@@ -524,7 +524,7 @@ Cobertura de casos de uso: todo RF vigente (RF-01 a RF-05, RF-07, RF-14, RF-15, 
 | S-26 | Solo las series elegibles (válidas) entran en mejor opción, veredicto y resaltados; series fallidas, "sin datos", sin stock o cerradas se excluyen. Los cambios de mejor opción por entrada/salida de series elegibles o por cambio de `r`/`s`/configuración no alertan. | RF-21, RF-22, RF-17, RF-15 |
 | S-27 | Mercado Libre vía MejoresCompras: solo precio garantizado (se registra como lista; contado y tarjetas "sin datos" salvo que se obtengan); el producto debe estar en el catálogo; una consulta por día; su serie de lista puede alertar por bajas. | RF-04, RF-07, RF-14, RF-20, RF-22, sección 12 |
 | S-28 | La lista de tiendas de RF-04 puede reducirse tras el spike de R-01 o por RNF-07, con decisión documentada; el criterio se evalúa contra la lista vigente. | RF-04, R-01 |
-| S-29 | Las tiendas se miden en paralelo entre sí; presupuesto mensual total ≤ 1.500 min (ejecuciones ≤ 1.200 + CI de validación ≤ 300). | RNF-01, RNF-12 |
+| S-29 | Las tiendas se miden en paralelo entre sí, de modo que el peor caso (≈ 5 min + sitio) entre en el timeout de 10 min por ejecución. Sin presupuesto mensual de minutos (repo público). | RNF-01, RNF-12 |
 | S-30 | Gráfico de línea escalonada hasta la última medición válida; desactualizado > 12 h (36 h en Mercado Libre). | RF-17 |
 | S-31 | Alcance de reglas: bajas mínimas sobre contado y total T de cada serie (no VP); `precio_objetivo` según `aplica_a`; reemplazo por producto por regla; `no` explícito desactiva la regla; sin claves = baja estricta; claves todas desactivadas = silencio. | RF-22 |
 | S-32 | Contador de fallas por tienda y serie; "sin stock" y "no disponible en catálogo" no cuentan como falla; en Mercado Libre el contador cuenta ejecuciones con intento fallido. | RF-15, RN-06, RF-04 |
