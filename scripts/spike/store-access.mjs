@@ -21,6 +21,7 @@ const argValue = (name, fallback) => {
 };
 const label = argValue('--label', process.env.GITHUB_ACTIONS ? 'actions' : 'local');
 const outDir = argValue('--out', 'spike-results');
+const only = new Set(argValue('--only', '').split(',').filter(Boolean)); // e.g. --only fravega,megatone
 
 const vtexUrl = (host) => `https://${host}/api/catalog_system/pub/products/search?ft=${PRODUCT.toLowerCase()}`;
 
@@ -263,13 +264,17 @@ function analyzeHtml(text) {
 
 // ---------- cash price research ----------
 const CASH_WORDS = /transferencia|efectivo|% ?off|precio especial|contado|d[eé]bito|descuento/gi;
-const toNumber = (str) => Number(String(str).replace(/./g, '').replace(',', '.'));
+// "2.299.999" / "2.299.999,50" (es-AR) or "2299999.00" (JSON-LD) -> number.
+const toNumber = (str) => {
+  const s = String(str).replace(/,$/, '');
+  return /^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s) ? Number(s.replace(/\./g, '').replace(',', '.')) : Number(s);
+};
 
 // Looks for cash-like wording near prices and reports prices lower than the reference price.
 function analyzeCashText(text) {
-  const sale = text.match(/"salePrice"s*:s*(d{5,})/);
-  const ld = text.match(/"(?:lowPrice|price)"s*:s*"?(d[d.]*)"?/);
-  const firstFormatted = text.match(/$s?(d{1,3}(?:.d{3})+)/);
+  const sale = text.match(/"salePrice"\s*:\s*(\d{5,})/);
+  const ld = text.match(/"(?:lowPrice|price)"\s*:\s*"?(\d[\d.]*)"?/);
+  const firstFormatted = text.match(/\$\s?(\d{1,3}(?:\.\d{3})+)/);
   const refPrice = sale ? Number(sale[1]) : ld ? toNumber(ld[1]) : firstFormatted ? toNumber(firstFormatted[1]) : null;
   const counts = {};
   const snippets = [];
@@ -278,9 +283,9 @@ function analyzeCashText(text) {
     const key = m[0].toLowerCase();
     counts[key] = (counts[key] ?? 0) + 1;
     const win = text.slice(Math.max(0, m.index - 160), m.index + 200);
-    const nums = [...win.matchAll(/$s?(d{1,3}(?:.d{3})+)|"(?:price|salePrice|specialPrice|cashPrice)"s*:s*(d{5,})/g)].map((x) => toNumber(x[1] ?? x[2]));
+    const nums = [...win.matchAll(/\$\s?(\d{1,3}(?:\.\d{3})+)|"(?:price|salePrice|specialPrice|cashPrice)"\s*:\s*(\d{5,})/g)].map((x) => toNumber(x[1] ?? x[2]));
     for (const n of nums) if (refPrice && n < refPrice && n > refPrice * 0.3) lower.add(n);
-    if (nums.length && snippets.length < 8) snippets.push(win.replace(/s+/g, ' ').slice(0, 300));
+    if (nums.length && snippets.length < 8) snippets.push(win.replace(/\s+/g, ' ').slice(0, 300));
   }
   return { refPrice, keywordCounts: counts, lowerPricesNearKeywords: [...lower].slice(0, 10), snippets };
 }
@@ -296,7 +301,7 @@ async function simulateVtex(host, offer) {
   const r = await fetchOnce(url, { method: 'POST', body, headers: { 'content-type': 'application/json' } });
   const out = { url, status: r.status, responseType: classify(r), ms: r.ms, itemId: offer.itemId, sellerId: offer.sellerId };
   if (out.responseType !== 'JSON') {
-    out.snippet = r.text.slice(0, 200).replace(/s+/g, ' ');
+    out.snippet = r.text.slice(0, 200).replace(/\s+/g, ' ');
     return out;
   }
   let j;
@@ -381,7 +386,7 @@ async function probeStore(store) {
 }
 
 const results = [];
-for (const store of STORES) {
+for (const store of STORES.filter((st) => only.size === 0 || only.has(st.id))) {
   process.stderr.write(`probing ${store.id}...\n`);
   try {
     results.push(await probeStore(store));
