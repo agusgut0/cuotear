@@ -1,0 +1,14 @@
+{
+  "verdict.contado": "Conviene contado",
+  "verdict.cuotas": "Conviene cuotas",
+  "verdict.sin_veredicto": "Sin veredicto",
+  "verdict.marginal": "Diferencia marginal",
+  "status.valida": "Válida",
+  "status.fallida": "Fallida",
+  "status.sin_datos": "Sin datos",
+  "status.sin_stock": "Sin stock",
+  "status.cerrada": "Cerrada",
+  "rate.origin.manual": "Valor manual",
+  "rate.origin.backup": "Valor manual de respaldo",
+  "rate.summary": "Inflación mensual {rate} ({source}), primera cuota en el mes {s}"
+}

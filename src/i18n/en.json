@@ -1,0 +1,14 @@
+{
+  "verdict.contado": "Cash is better",
+  "verdict.cuotas": "Installments are better",
+  "verdict.sin_veredicto": "No verdict",
+  "verdict.marginal": "Marginal difference",
+  "status.valida": "Valid",
+  "status.fallida": "Failed",
+  "status.sin_datos": "No data",
+  "status.sin_stock": "Out of stock",
+  "status.cerrada": "Closed",
+  "rate.origin.manual": "Manual value",
+  "rate.origin.backup": "Manual fallback value",
+  "rate.summary": "Monthly inflation {rate} ({source}), first installment in month {s}"
+}
