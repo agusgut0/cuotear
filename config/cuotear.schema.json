@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cuotear.local/config/cuotear.schema.json",
+  "title": "cuotear: configuración v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "productos"],
+  "properties": {
+    "version": { "const": 1 },
+    "alertas": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "canal": { "enum": ["telegram", "ninguno"], "default": "telegram" },
+        "idioma": { "enum": ["es-AR", "en"], "default": "es-AR" },
+        "reglas": { "$ref": "#/$defs/reglas" }
+      }
+    },
+    "comparacion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "s": { "enum": [0, 1], "default": 1 },
+        "inflacion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fuente"],
+          "properties": {
+            "fuente": { "enum": ["rem", "manual"] },
+            "manual": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["periodo", "pct"],
+              "properties": {
+                "periodo": { "enum": ["mensual", "anual"] },
+                "pct": { "type": "number", "minimum": 0, "maximum": 1000 }
+              }
+            }
+          },
+          "if": { "properties": { "fuente": { "const": "manual" } } },
+          "then": { "required": ["manual"] }
+        }
+      }
+    },
+    "operacion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fallas_para_sin_datos": { "type": "integer", "minimum": 1, "maximum": 20, "default": 4 },
+        "desactualizado_horas": { "type": "integer", "minimum": 1, "maximum": 168, "default": 12 },
+        "retencion_meses": { "type": "integer", "minimum": 1, "maximum": 60, "default": 12 },
+        "marginal_pct": { "type": "number", "minimum": 0, "maximum": 10, "default": 1 },
+        "verificar_baja_pct": { "type": "number", "minimum": 50, "maximum": 100, "default": 90 },
+        "codigo_postal": { "type": "string", "pattern": "^[0-9]{4}$", "default": "5000" }
+      }
+    },
+    "productos": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/producto" }
+    }
+  },
+  "$defs": {
+    "desactivable_pos": {
+      "oneOf": [
+        { "type": "number", "exclusiveMinimum": 0 },
+        { "const": false },
+        { "const": "no" }
+      ]
+    },
+    "reglas": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "baja_minima_pct": {
+          "oneOf": [
+            { "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
+            { "const": false },
+            { "const": "no" }
+          ]
+        },
+        "baja_minima_monto": { "$ref": "#/$defs/desactivable_pos" },
+        "precio_objetivo": { "$ref": "#/$defs/desactivable_pos" },
+        "aplica_a": { "enum": ["contado", "total_cuotas", "mejor_vp"] },
+        "cambio_mejor_opcion": { "type": "boolean" }
+      }
+    },
+    "producto": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "nombre", "urls"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$" },
+        "nombre": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "urls": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 10,
+          "propertyNames": { "pattern": "^[a-z0-9-]{2,30}$" },
+          "additionalProperties": { "type": "string", "minLength": 12, "maxLength": 500, "pattern": "^https://" }
+        },
+        "reglas": { "$ref": "#/$defs/reglas" }
+      }
+    }
+  }
+}

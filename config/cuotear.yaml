@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=./cuotear.schema.json
+version: 1
+alertas:
+  canal: telegram # telegram | ninguno
+  idioma: es-AR # es-AR | en
+  reglas: # globales; cada producto puede reemplazar por regla
+    baja_minima_pct: 5
+    cambio_mejor_opcion: true
+comparacion:
+  s: 1 # mes de la primera cuota: 0 o 1
+  inflacion:
+    fuente: manual # rem | manual (rem llega en una fase posterior)
+    manual:
+      periodo: mensual # mensual | anual
+      pct: 2.5 # porcentaje, >= 0
+productos:
+  # EJEMPLO: la URL de On City es ilustrativa (slug plausible, no verificado).
+  # Reemplazala por la URL real de la ficha antes de usar el monitor.
+  - id: tcl-75t6c
+    nombre: 'Smart TV TCL 75" 75T6C'
+    urls:
+      oncity: https://www.oncity.com/smart-tv-tcl-75-qled-4k-75t6c/p
