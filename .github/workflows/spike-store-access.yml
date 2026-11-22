@@ -4,9 +4,6 @@ name: Spike - store access
 # and whether prices can be extracted. Manual only; no secrets; read-only.
 on:
   workflow_dispatch:
-  # remove after spike
-  push:
-    branches: [spike/store-access]
 
 permissions:
   contents: read
