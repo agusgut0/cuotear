@@ -4,7 +4,7 @@
 - **Script:** [scripts/spike/store-access.mjs](../../scripts/spike/store-access.mjs) (Node ≥ 20, sin dependencias, 1 pedido/s por dominio, timeout 15 s, User-Agent identificable, sin login ni captchas).
 - **Workflow:** [.github/workflows/spike-store-access.yml](../../.github/workflows/spike-store-access.yml) (solo `workflow_dispatch`, `contents: read`, acciones fijadas por SHA, sin secretos, 10 min).
 - **Relacionado:** riesgo R-01 y preguntas 5–8 del DRT en [docs/specs/DAF.md](../specs/DAF.md).
-- **Estado:** corrida local hecha el 2026-11-22 (IP argentina), incluida la investigación de contado. **La corrida en GitHub Actions está pendiente** (el workflow también se dispara con el push de la rama); la columna "Actions" y la recomendación final se completan después.
+- **Estado:** corrida local (IP argentina) y corrida en GitHub Actions (runner `ubuntu-24.04`, Node 22, 2026-11-22, run #1 por push) completadas. Ambas incluyen la investigación de contado.
 
 ## Resultados por tienda
 
@@ -12,17 +12,17 @@ Leyenda: Lista = precio de lista; Contado = precio de un pago con su condición;
 
 | Tienda | Local (IP AR) | Actions | Lista | Contado | V / M / N |
 |---|---|---|---|---|---|
-| On City | 200, JSON (API VTEX), 1 producto | pendiente | Sí (2.299.999) | Parcial (ver notas) | 15x / 18x / 12x |
-| Carrefour | 200, JSON (API VTEX, Cloudflare), 3 ofertas | pendiente | Sí (lista 2.999.999, precio 2.189.999) | Parcial (medio "Efectivo", mismo valor que el precio) | No / 3x / No |
-| Cetrogar | 200, JSON (API VTEX), 1 producto | pendiente | Sí (2.299.999) | Parcial (ver notas) | 15x / 15x / 12x |
-| Naldo | 200, JSON (API VTEX), **0 coincidencias** | pendiente | Sin dato (el modelo no figura) | Sin dato | Sin dato |
-| Musimundo | 200, pero redirige a la home (HTML estático) | pendiente | No | No | No |
-| Frávega | 200, HTML con `__NEXT_DATA__` | pendiente | Sí (2.299.999) | No | No (solo filtros genéricos) |
-| Megatone | Búsqueda: 404. URL de producto directa: 200, HTML | pendiente | Sí (2.299.999, JSON-LD) | No | No |
-| Rodo | 200 (Cloudflare), HTML sin precios | pendiente | No | No | No |
-| MejoresCompras (ML) | 200 (Cloudflare), HTML | pendiente | Sí (1.779.999; JSON-LD 1.902.299) | No | No |
+| On City | 200, JSON (API VTEX), 1 producto | 200, JSON, igual que local (708 ms) | Sí (2.299.999) | Parcial (ver notas) | 15x / 18x / 12x |
+| Carrefour | 200, JSON (API VTEX, Cloudflare), 3 ofertas | 200, JSON, igual que local (371 ms) | Sí (lista 2.999.999, precio 2.189.999) | Parcial (medio "Efectivo", mismo valor que el precio) | No / 3x / No |
+| Cetrogar | 200, JSON (API VTEX), 1 producto | 200, JSON, igual que local (526 ms) | Sí (2.299.999) | Parcial (ver notas) | 15x / 15x / 12x |
+| Naldo | 200, JSON (API VTEX), **0 coincidencias** | 200, JSON, 0 coincidencias (igual) | Sin dato (el modelo no figura) | Sin dato | Sin dato |
+| Musimundo | 200, pero redirige a la home (HTML estático) | 200, HTML estático (igual) | No | No | No |
+| Frávega | 200, HTML con `__NEXT_DATA__` | **403 bloqueado** (CloudFront) | Sí (2.299.999) | No | No (solo filtros genéricos) |
+| Megatone | Búsqueda: 404. URL de producto directa: 200, HTML | 200, HTML, igual que local (980 ms) | Sí (2.299.999, JSON-LD) | No | No |
+| Rodo | 200 (Cloudflare), HTML sin precios | 200, HTML sin precios (igual) | No | No | No |
+| MejoresCompras (ML) | 200 (Cloudflare), HTML | **403 bloqueado** (Cloudflare, "Just a moment...") | Sí (1.779.999; JSON-LD 1.902.299) | No | No |
 
-Tiempos locales: 70–1.100 ms por pedido; ningún bloqueo, captcha ni timeout.
+Tiempos locales: 70–1.100 ms por pedido; ningún bloqueo, captcha ni timeout. En Actions: 250–1.700 ms, **dos bloqueos 403** (Frávega y MejoresCompras) y ningún timeout.
 
 ## Notas por tienda
 
@@ -48,7 +48,6 @@ Tiempos locales: 70–1.100 ms por pedido; ningún bloqueo, captcha ni timeout.
 - Descuentos de contado que solo se apliquen con un paso real de checkout (login, cupón, medio de pago concreto).
 - Estabilidad a lo largo del tiempo y límites de tasa con más pedidos.
 - Términos de uso y robots.txt de cada tienda (RNF-07, DRT pregunta 8).
-- El resultado desde los runners de GitHub Actions (pendiente).
 
 ## Cómo correrlo en GitHub Actions
 
@@ -61,7 +60,14 @@ Tiempos locales: 70–1.100 ms por pedido; ningún bloqueo, captcha ni timeout.
 
 Con `gh` instalado: `gh workflow run spike-store-access.yml --ref spike/store-access` y `gh run download`.
 
-## Recomendación provisional (solo con datos locales)
+## Local vs Actions: diferencias
+
+- **Idénticas** (mismo estado, mismos datos extraíbles): On City, Carrefour, Cetrogar, Naldo, Musimundo, Megatone y Rodo. Las simulaciones de checkout VTEX también dieron los mismos totales desde Actions, sin ningún medio de pago por debajo del precio publicado.
+- **Frávega:** 200 en local, **403 desde Actions** (respuesta de CloudFront). Los runners de GitHub (IPs de datacenter) quedan bloqueados.
+- **MejoresCompras:** 200 en local, **403 desde Actions** con la página de desafío de Cloudflare ("Just a moment..."). Sin resolver captchas ni evadir el desafío, la fuente de Mercado Libre no se puede leer desde los runners.
+- Esto confirma el riesgo R-01 del DAF: el bloqueo de IPs de datacenter es real, pero solo afecta a 2 de las 9 tiendas; las APIs VTEX no discriminan.
+
+## Recomendación
 
 | Tienda | Recomendación | Motivo |
 |---|---|---|
@@ -69,17 +75,19 @@ Con `gh` instalado: `gh workflow run spike-store-access.yml --ref spike/store-ac
 | Cetrogar | **Incluir** | Igual que On City. |
 | Carrefour | **Incluir con degradación** | Funciona, pero con selección de vendedor, sin stock en una oferta y solo Mastercard 3 cuotas. |
 | Naldo | **Incluir con degradación** (provisional) | API VTEX utilizable, pero sin producto de prueba en stock; validar con otro modelo. |
-| Frávega | **Incluir con degradación** | Solo lista; cuotas por tarjeta y contado requieren más investigación. |
-| MejoresCompras (ML) | **Incluir con degradación** | Best effort: solo precio, catálogo limitado, snapshot diario. |
+| Frávega | **Descartar de v1 por ahora** | 403 desde Actions; además solo se obtenía lista. No se evade el bloqueo. Reabrir si hay otro endpoint no bloqueado o un runner con otra IP. |
+| MejoresCompras (ML) | **No viable desde Actions** | Cloudflare bloquea al runner (403). Mercado Libre queda sin cobertura salvo que el DRT encuentre otra fuente (por ejemplo, la API oficial de Mercado Libre; a verificar). |
 | Rodo | **Descartar de v1 por ahora** | Sin precios en el HTML inicial; reabrir si se encuentra un endpoint. |
 | Megatone | **Incluir con degradación** | Solo con URL de producto directa y solo precio de lista; sin búsqueda accesible. |
 | Musimundo | **Descartar de v1 por ahora** | No expone catálogo (redirige a la home); posible migración a On City. |
 
-**Contado:** ver la sección siguiente. Con lo observado, ninguna tienda expone un descuento de contado distinto del precio publicado, ni siquiera simulando el checkout. La recomendación final se confirma cuando esté la corrida de Actions.
+**Cobertura resultante en v1 (desde Actions):** On City, Cetrogar, Carrefour, Naldo (provisional) y Megatone (solo URL de producto). Es decir, 5 de las 9 tiendas del DAF; Musimundo, Rodo, Frávega y Mercado Libre quedan fuera por ahora. Esto activa la cláusula de RF-04 ("la lista puede reducirse tras el spike") y exige que el DRT decida cómo tratar Mercado Libre.
+
+**Contado:** ver la sección "Contado". Con lo observado, ninguna tienda expone un descuento de contado distinto del precio publicado, ni siquiera simulando el checkout. La recomendación final se confirma cuando esté la corrida de Actions.
 
 ## Contado
 
-Investigación adicional (corrida local, 2026-11-22): ¿algún medio de pago baja el total por debajo del precio publicado?
+Investigación adicional (corridas local y Actions, 2026-11-22; resultados idénticos en las tiendas VTEX): ¿algún medio de pago baja el total por debajo del precio publicado?
 
 **VTEX: simulación de checkout** (`POST /api/checkout/pub/orderForms/simulation`, 1 unidad, país ARG, código postal 5000, SKU y vendedor tomados de la API de búsqueda).
 
