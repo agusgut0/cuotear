@@ -1,0 +1,21 @@
+{
+  "outcome": "ok",
+  "listaCents": 100000000,
+  "contado": {
+    "valorCents": 100000000,
+    "medio": "ninguno",
+    "descuentoPct": null
+  },
+  "tarjetas": {
+    "visa": null,
+    "mastercard": {
+      "invalida": true,
+      "motivo": "the published total differs from n x installment by more than n pesos"
+    },
+    "naranja": {
+      "n": 3,
+      "cuotaCents": 33333333,
+      "totalCents": 99999999
+    }
+  }
+}

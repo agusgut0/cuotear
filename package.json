@@ -13,6 +13,7 @@
     "typecheck": "tsc -p jsconfig.json",
     "test": "node --test \"test/**/*.test.js\"",
     "validate-config": "node src/cli/validate-config.js",
+    "fixtures:capture": "node scripts/fixtures-capture.js",
     "build-site": "node -e \"console.log('build-site: the static site is not implemented yet (DRT phase F2); nothing to build.')\""
   },
   "dependencies": {

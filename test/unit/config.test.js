@@ -38,6 +38,8 @@ const fakeStore = (id) => ({
   hosts: [`www.${id}.com`],
   status: /** @type {const} */ ('vigente'),
   validateUrl: checkVtexProductUrl,
+  measure: async () => ({ outcome: /** @type {const} */ ('sin_oferta'), meta: { requests: 0, ms: 0 } }),
+  captureUrls: () => [],
 });
 
 describe('RF-19: base configuration', () => {

@@ -1,0 +1,70 @@
+[
+  {
+    "productId": "1",
+    "productName": "Synthetic TV 75",
+    "linkText": "synthetic-tv-75",
+    "items": [
+      {
+        "itemId": "1",
+        "name": "Item 1",
+        "sellers": [
+          {
+            "sellerId": "1",
+            "sellerName": "Seller 1",
+            "sellerDefault": true,
+            "commertialOffer": {
+              "Price": 1000000,
+              "ListPrice": 1000000,
+              "AvailableQuantity": 4,
+              "IsAvailable": true,
+              "Installments": [
+                {
+                  "PaymentSystemName": "Visa",
+                  "NumberOfInstallments": 1,
+                  "Value": 800000,
+                  "TotalValuePlusInterestRate": 800000,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Efectivo",
+                  "NumberOfInstallments": 1,
+                  "Value": 1200000,
+                  "TotalValuePlusInterestRate": 1200000,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Cabal Débito",
+                  "NumberOfInstallments": 1,
+                  "Value": 950000,
+                  "TotalValuePlusInterestRate": 950000,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Transferencia Bancaria - Con descuento adicional",
+                  "NumberOfInstallments": 1,
+                  "Value": 900000,
+                  "TotalValuePlusInterestRate": 900000,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Maestro",
+                  "NumberOfInstallments": 1,
+                  "Value": 920000,
+                  "TotalValuePlusInterestRate": 920000,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Visa Electron",
+                  "NumberOfInstallments": 1,
+                  "Value": 960000,
+                  "TotalValuePlusInterestRate": 960000,
+                  "InterestRate": 0
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+]
