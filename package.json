@@ -1,0 +1,28 @@
+{
+  "name": "cuotear",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Serverless price monitor for Argentine online stores: cash price vs interest-free installments.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc -p jsconfig.json",
+    "test": "node --test \"test/**/*.test.js\"",
+    "validate-config": "node src/cli/validate-config.js",
+    "build-site": "node -e \"console.log('build-site: the static site is not implemented yet (DRT phase F2); nothing to build.')\""
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.15.0",
+    "globals": "^17.14.0",
+    "typescript": "^7.0.2"
+  }
+}

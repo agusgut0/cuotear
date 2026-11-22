@@ -31,3 +31,6 @@ pnpm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# Runtime state and generated site (never committed)
+.state/
