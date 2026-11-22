@@ -46,7 +46,8 @@ const STORES = [
     id: 'megatone',
     name: 'Megatone',
     kind: 'html',
-    urls: [`https://www.megatone.net/search/?q=${PRODUCT.toLowerCase()}`],
+    // Search URLs return 404, so probe the direct product URL instead.
+    urls: ['https://www.megatone.net/producto/televisor-tcl-75t6c-qled-75-4k-uhd-google-tv-dlg-120hz_MKT028PMTP/'],
   },
   {
     id: 'rodo',
@@ -61,6 +62,8 @@ const STORES = [
     urls: ['https://mejorescompras.com.ar/precio/MLA75633247'],
   },
 ];
+
+const SIMULATE = new Set(['oncity', 'cetrogar', 'carrefour']);
 
 const CARDS = {
   visa: /visa/i,
@@ -78,18 +81,21 @@ async function politeWait(host) {
 }
 
 // ---------- fetch ----------
-async function fetchOnce(url) {
+async function fetchOnce(url, { method = 'GET', body, headers = {} } = {}) {
   const host = new URL(url).host;
   await politeWait(host);
   const started = performance.now();
   try {
     const res = await fetch(url, {
+      method,
+      body,
       redirect: 'follow',
       signal: AbortSignal.timeout(TIMEOUT_MS),
       headers: {
         'user-agent': USER_AGENT,
         accept: 'application/json, text/html;q=0.9, */*;q=0.5',
         'accept-language': 'es-AR,es;q=0.9',
+        ...headers,
       },
     });
     const text = (await res.text()).slice(0, MAX_BODY);
@@ -176,6 +182,8 @@ function analyzeVtex(text) {
         out.offers.push({
           product: p.productName,
           seller: seller.sellerName,
+          itemId: item.itemId,
+          sellerId: seller.sellerId,
           available: o.AvailableQuantity,
           listPrice: o.ListPrice ?? null,
           price: o.Price ?? null,
@@ -248,8 +256,77 @@ function analyzeHtml(text) {
       mastercard: cards.mastercard.length > 0,
       naranja: cards.naranja.length > 0,
     },
+    cashAnalysis: analyzeCashText(text),
     note: 'HTML analysis is heuristic: raw SSR text only, no JS execution.',
   };
+}
+
+// ---------- cash price research ----------
+const CASH_WORDS = /transferencia|efectivo|% ?off|precio especial|contado|d[eé]bito|descuento/gi;
+const toNumber = (str) => Number(String(str).replace(/./g, '').replace(',', '.'));
+
+// Looks for cash-like wording near prices and reports prices lower than the reference price.
+function analyzeCashText(text) {
+  const sale = text.match(/"salePrice"s*:s*(d{5,})/);
+  const ld = text.match(/"(?:lowPrice|price)"s*:s*"?(d[d.]*)"?/);
+  const firstFormatted = text.match(/$s?(d{1,3}(?:.d{3})+)/);
+  const refPrice = sale ? Number(sale[1]) : ld ? toNumber(ld[1]) : firstFormatted ? toNumber(firstFormatted[1]) : null;
+  const counts = {};
+  const snippets = [];
+  const lower = new Set();
+  for (const m of text.matchAll(CASH_WORDS)) {
+    const key = m[0].toLowerCase();
+    counts[key] = (counts[key] ?? 0) + 1;
+    const win = text.slice(Math.max(0, m.index - 160), m.index + 200);
+    const nums = [...win.matchAll(/$s?(d{1,3}(?:.d{3})+)|"(?:price|salePrice|specialPrice|cashPrice)"s*:s*(d{5,})/g)].map((x) => toNumber(x[1] ?? x[2]));
+    for (const n of nums) if (refPrice && n < refPrice && n > refPrice * 0.3) lower.add(n);
+    if (nums.length && snippets.length < 8) snippets.push(win.replace(/s+/g, ' ').slice(0, 300));
+  }
+  return { refPrice, keywordCounts: counts, lowerPricesNearKeywords: [...lower].slice(0, 10), snippets };
+}
+
+// VTEX checkout simulation: total per payment system in 1 payment, compared with the published price.
+async function simulateVtex(host, offer) {
+  const url = `https://${host}/api/checkout/pub/orderForms/simulation`;
+  const body = JSON.stringify({
+    items: [{ id: String(offer.itemId), quantity: 1, seller: String(offer.sellerId) }],
+    country: 'ARG',
+    postalCode: '5000',
+  });
+  const r = await fetchOnce(url, { method: 'POST', body, headers: { 'content-type': 'application/json' } });
+  const out = { url, status: r.status, responseType: classify(r), ms: r.ms, itemId: offer.itemId, sellerId: offer.sellerId };
+  if (out.responseType !== 'JSON') {
+    out.snippet = r.text.slice(0, 200).replace(/s+/g, ' ');
+    return out;
+  }
+  let j;
+  try {
+    j = JSON.parse(r.text);
+  } catch {
+    out.note = 'invalid JSON';
+    return out;
+  }
+  const item = j.items?.[0] ?? {};
+  const published = offer.price;
+  out.published = published;
+  out.itemPrice = item.price != null ? item.price / 100 : null;
+  out.itemSellingPrice = item.sellingPrice != null ? item.sellingPrice / 100 : null;
+  out.availability = item.availability;
+  out.totals = (j.totals ?? []).map((t) => ({ id: t.id, value: t.value / 100 }));
+  out.messages = (j.messages ?? []).map((m) => String(m.text ?? m.code ?? '').slice(0, 120)).slice(0, 3);
+  out.promotionTags = (j.ratesAndBenefitsData?.rateAndBenefitsIdentifiers ?? []).map((x) => x.name ?? x.id).slice(0, 5);
+  const names = new Map((j.paymentData?.paymentSystems ?? []).map((ps) => [String(ps.id), ps.name]));
+  const options = j.paymentData?.installmentOptions ?? [];
+  out.onePaymentBySystem = options
+    .map((o) => {
+      const one = (o.installments ?? []).find((i) => i.count === 1);
+      const name = names.get(String(o.paymentSystem)) ?? o.paymentName ?? o.paymentSystem;
+      return one ? { system: name, total: one.total / 100, belowPublished: published != null && one.total / 100 < published } : null;
+    })
+    .filter(Boolean);
+  out.anyBelowPublished = out.onePaymentBySystem.some((x) => x.belowPublished);
+  out.hasPaymentData = options.length > 0;
+  return out;
 }
 
 // ---------- main ----------
@@ -273,6 +350,32 @@ async function probeStore(store) {
     else if (cls === 'HTML' || cls === 'JSON') entry.analysis = analyzeHtml(r.text);
     else entry.snippet = r.text.slice(0, 200).replace(/\s+/g, ' ');
     attempts.push(entry);
+
+    // Cash research: VTEX checkout simulation for the first in-stock offer.
+    if (store.kind === 'vtex' && SIMULATE.has(store.id) && entry.analysis?.offers) {
+      const offer = entry.analysis.offers.find((o) => o.itemId && o.price > 0);
+      entry.simulation = offer
+        ? await simulateVtex(new URL(url).host, offer)
+        : { note: 'no in-stock offer to simulate' };
+    }
+
+    // Cash research: Frávega product pages (SSR HTML), looking for cash wording and lower prices.
+    if (store.id === 'fravega' && cls === 'HTML') {
+      const slugs = [...new Set([...r.text.matchAll(/\/p\/([a-z0-9-]*75t6c[a-z0-9-]*\/)/gi)].map((m) => m[1]))].slice(0, 3);
+      entry.productPages = [];
+      for (const slug of slugs) {
+        const pageUrl = `https://www.fravega.com/p/${slug}`;
+        const pr = await fetchOnce(pageUrl);
+        const pcls = classify(pr);
+        entry.productPages.push({
+          url: pageUrl,
+          status: pr.status,
+          responseType: pcls,
+          ms: pr.ms,
+          cash: pcls === 'HTML' ? analyzeCashText(pr.text) : null,
+        });
+      }
+    }
   }
   return { id: store.id, name: store.name, kind: store.kind, attempts };
 }

@@ -4,7 +4,7 @@
 - **Script:** [scripts/spike/store-access.mjs](../../scripts/spike/store-access.mjs) (Node ≥ 20, sin dependencias, 1 pedido/s por dominio, timeout 15 s, User-Agent identificable, sin login ni captchas).
 - **Workflow:** [.github/workflows/spike-store-access.yml](../../.github/workflows/spike-store-access.yml) (solo `workflow_dispatch`, `contents: read`, acciones fijadas por SHA, sin secretos, 10 min).
 - **Relacionado:** riesgo R-01 y preguntas 5–8 del DRT en [docs/specs/DAF.md](../specs/DAF.md).
-- **Estado:** corrida local hecha el 2026-11-22 (IP argentina). **La corrida en GitHub Actions está pendiente**; la columna "Actions" y la recomendación final se completan después.
+- **Estado:** corrida local hecha el 2026-11-22 (IP argentina), incluida la investigación de contado. **La corrida en GitHub Actions está pendiente** (el workflow también se dispara con el push de la rama); la columna "Actions" y la recomendación final se completan después.
 
 ## Resultados por tienda
 
@@ -18,7 +18,7 @@ Leyenda: Lista = precio de lista; Contado = precio de un pago con su condición;
 | Naldo | 200, JSON (API VTEX), **0 coincidencias** | pendiente | Sin dato (el modelo no figura) | Sin dato | Sin dato |
 | Musimundo | 200, pero redirige a la home (HTML estático) | pendiente | No | No | No |
 | Frávega | 200, HTML con `__NEXT_DATA__` | pendiente | Sí (2.299.999) | No | No (solo filtros genéricos) |
-| Megatone | 404 en las URL de búsqueda probadas | pendiente | No | No | No |
+| Megatone | Búsqueda: 404. URL de producto directa: 200, HTML | pendiente | Sí (2.299.999, JSON-LD) | No | No |
 | Rodo | 200 (Cloudflare), HTML sin precios | pendiente | No | No | No |
 | MejoresCompras (ML) | 200 (Cloudflare), HTML | pendiente | Sí (1.779.999; JSON-LD 1.902.299) | No | No |
 
@@ -36,7 +36,7 @@ Tiempos locales: 70–1.100 ms por pedido; ningún bloqueo, captcha ni timeout.
 
 **Frávega.** El HTML renderizado en servidor incluye `__NEXT_DATA__` con el producto: `salePrice`, `listPrice`, descuento y `withoutTax` (2.299.999 / 2.299.999 / 0 % / 1.900.826 sin impuestos). Las cuotas aparecen solo como filtros agregados ("9 cuotas sin interés"), no por tarjeta, y no hay contado por medio de pago en esa respuesta. Posiblemente la ficha del producto o un endpoint interno tenga más detalle (no probado).
 
-**Megatone.** `/search/?q=` y `/busqueda/?q=` devuelven 404. La home es una SPA grande (`/next/...`). No se descubrió un endpoint de búsqueda con pedidos HTTP simples; necesita inspeccionar el tráfico del navegador (fuera de este spike).
+**Megatone.** `/search/?q=` y `/busqueda/?q=` devuelven 404 (la home es una SPA grande, `/next/...`), pero la **URL de producto directa** responde 200 con HTML de ~55 KB y JSON-LD con el precio (2.299.999). No trae cuotas por tarjeta ni contado en el HTML inicial. Sirve si el usuario carga la URL del producto en la configuración (RF-19), no para buscar por nombre.
 
 **Rodo.** Magento detrás de Cloudflare. La búsqueda responde 200 y menciona el producto, pero el HTML inicial no trae precios (se cargan por JavaScript o por otro endpoint). Necesita descubrir ese endpoint.
 
@@ -45,7 +45,7 @@ Tiempos locales: 70–1.100 ms por pedido; ningún bloqueo, captcha ni timeout.
 ## Qué no cubre este spike
 
 - Búsqueda a mano de los endpoints internos de Frávega, Megatone y Rodo (requiere inspeccionar el navegador).
-- Si el contado con descuento adicional existe en otra parte (checkout, promos).
+- Descuentos de contado que solo se apliquen con un paso real de checkout (login, cupón, medio de pago concreto).
 - Estabilidad a lo largo del tiempo y límites de tasa con más pedidos.
 - Términos de uso y robots.txt de cada tienda (RNF-07, DRT pregunta 8).
 - El resultado desde los runners de GitHub Actions (pendiente).
@@ -72,7 +72,33 @@ Con `gh` instalado: `gh workflow run spike-store-access.yml --ref spike/store-ac
 | Frávega | **Incluir con degradación** | Solo lista; cuotas por tarjeta y contado requieren más investigación. |
 | MejoresCompras (ML) | **Incluir con degradación** | Best effort: solo precio, catálogo limitado, snapshot diario. |
 | Rodo | **Descartar de v1 por ahora** | Sin precios en el HTML inicial; reabrir si se encuentra un endpoint. |
-| Megatone | **Descartar de v1 por ahora** | Sin URL de búsqueda accesible; reabrir si se encuentra un endpoint. |
+| Megatone | **Incluir con degradación** | Solo con URL de producto directa y solo precio de lista; sin búsqueda accesible. |
 | Musimundo | **Descartar de v1 por ahora** | No expone catálogo (redirige a la home); posible migración a On City. |
 
-**Contado:** con lo observado, ninguna tienda expone un descuento de contado distinto del precio publicado. Eso afecta RF-20: el diseño debe prever "contado = precio de un pago con su medio de pago" y tratar los descuentos adicionales como un dato a investigar. La recomendación final se confirma cuando esté la corrida de Actions.
+**Contado:** ver la sección siguiente. Con lo observado, ninguna tienda expone un descuento de contado distinto del precio publicado, ni siquiera simulando el checkout. La recomendación final se confirma cuando esté la corrida de Actions.
+
+## Contado
+
+Investigación adicional (corrida local, 2026-11-22): ¿algún medio de pago baja el total por debajo del precio publicado?
+
+**VTEX: simulación de checkout** (`POST /api/checkout/pub/orderForms/simulation`, 1 unidad, país ARG, código postal 5000, SKU y vendedor tomados de la API de búsqueda).
+
+| Tienda | Total simulado | Medios de pago con total en 1 pago | ¿Alguno menor que el publicado? |
+|---|---|---|---|
+| On City | 2.299.999 (publicado 2.299.999) | 12 (Amex, Visa, Mastercard, Visa Electron, Cabal, Naranja, Maestro, MercadoPagoPro, Modo, On City Crédito, Patagonia 365, Cabal Débito) | No: todos 2.299.999 |
+| Cetrogar | 2.299.999 (publicado 2.299.999) | 12 (incluye "Transferencia Bancaria - Con descuento adicional" y "Mastercard Debit") | No: todos 2.299.999 |
+| Carrefour | 2.189.999 (publicado 2.189.999, vendedor Producteca225119) | 15 (incluye "Efectivo") | No: todos 2.189.999 |
+
+- El endpoint responde 200 sin autenticación en las tres tiendas y devuelve `paymentData.installmentOptions` por medio de pago.
+- `messages` y promociones de precio vacíos. Cetrogar solo devuelve una promoción de envío ("25% valor envio"), no de precio.
+- **Conclusión:** el nombre del medio de pago puede sugerir un descuento ("Transferencia Bancaria - Con descuento adicional"), pero la simulación no lo refleja en el total. Si ese descuento existe, se aplica en un paso posterior del checkout o requiere condiciones que no se pueden simular de forma anónima. No hay forma de obtenerlo con estos endpoints.
+
+**Frávega.** Se leyeron la búsqueda y las 3 fichas de producto (HTML renderizado en servidor). Aparecen solo textos genéricos ("descuento", "% off") y ningún texto de transferencia, efectivo o precio especial. Además el HTML de la ficha **no trae el precio** (se carga después por JavaScript), por lo que tampoco se pudo comparar contra un precio menor. El único precio verificado es el de la búsqueda (`salePrice` = `listPrice` = 2.299.999, sin descuento). Hay un listado de vendedor "Multipoint" (marketplace).
+
+**Megatone.** La ficha directa trae el precio en JSON-LD (2.299.999) y solo textos genéricos de "descuento"; ninguna mención a transferencia, efectivo o precio menor.
+
+**Qué significa para el DAF y el DRT (RF-20, RN-05, RN-14):**
+1. En las tiendas probadas, el **contado observable es el precio publicado**, con su medio de pago como condición (por ejemplo "efectivo" en Carrefour). No se pudo demostrar ningún descuento de contado adicional.
+2. El modelo de datos debe permitir `contado = precio publicado, condición = medio de pago` (descuento 0 %) y dejar espacio para un descuento cuando una tienda lo exponga.
+3. La diferencia contado vs cuotas (RF-21) seguirá siendo útil igual: compara el precio de un pago contra el total en cuotas sin interés, aunque ambos suelan coincidir en monto nominal.
+4. Queda abierto si existen descuentos que solo se ven en el checkout real; no se pueden automatizar sin login.
