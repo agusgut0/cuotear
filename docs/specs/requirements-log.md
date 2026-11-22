@@ -21,7 +21,7 @@ Status: confirmed | assumed | open | superseded (kept for history; never deleted
 | RF-09 | Alert channel: email. | User answer 3 | superseded (Round 7) by RF-23 (Telegram or email from GitHub Actions, single recipient). |
 | RF-10 | Alert trigger: any price drop versus the previous measurement (per price type: cash / per card installments). | User answer 4 | superseded (Round 7) by RF-22 (configurable rules); "any strict drop" stays as the default when no rule is set. |
 | A-02 | Price history stored as files in the repo. | Assumption | confirmed (Round 7): no database/backend, history lives in repo files (RF-24). |
-| Q-01 | MejoresCompras (https://mejorescompras.com.ar/) is the source used for Mercado Libre prices. | User answer | confirmed (scraping method/ToS to review; Round 7: best-effort source) |
+| Q-01 | MejoresCompras (https://mejorescompras.com.ar/) is the source used for Mercado Libre prices. | User answer | confirmed (scraping method/ToS to review; Round 7: best-effort source); **superseded in Round 10**: MejoresCompras returns 403 to GitHub-hosted runners, so it is not a v1 source (S-35) |
 | RF-11 | Authentication via Google or GitHub OAuth; the verified email is used for alerts. | User answer 1a (round 3) | superseded (Round 7): no login/accounts in v1; moved to v2. |
 | RN-02 | Limit of 5 products per user (lowered from the 10 in CLAUDE.md). | User answer 2a (round 3) | superseded (Round 7): no per-user model; limit is back to 10 products (RF-02). |
 | RN-03 | Global cap of 50 unique product URLs; identical products are shared across users (scraped once). | User answer 2a (round 3) | superseded (Round 7): there is a single user, so no global cap or cross-user sharing. |
@@ -173,3 +173,44 @@ Source: internal coherence review of DAF v0.2 (DAF now v0.3). Facts below marked
 | ID | Requirement | Source | Status |
 |----|-------------|--------|--------|
 | RNF-01 | Public repo + standard runners = free Actions minutes, so there is no monthly minutes budget (the 1,500 min/month figure from Round 8 is dropped). The relevant limit is the per-run timeout (<= 10 min, `timeout-minutes`). If the repo became private, re-evaluate the minutes quota. | User instruction (2026-11-22) | confirmed |
+
+## Round 10 - spike findings
+
+Source: store-access spike, verified 2026-11-22 from a local Argentine IP and a GitHub-hosted runner (ubuntu-24.04); report `docs/spikes/store-access.md` on branch `spike/store-access`. DAF bumped to v0.4. Facts below are verified evidence; decisions are **Assumption (Claude)** (S-35 to S-40).
+
+### 10.1 Evidence
+
+| Store | Result from the runner | Notes |
+|-------|------------------------|-------|
+| On City | VTEX JSON API works (local and runner) | List price; interest-free installments Visa 15x, Mastercard 18x, Naranja X 12x |
+| Cetrogar | VTEX JSON API works | Visa 15x, Mastercard 15x, Naranja X 12x |
+| Carrefour | VTEX JSON API works | Only Mastercard 3x; two sellers (one with price 0 / no stock) |
+| Naldo | VTEX API works | The TCL 75T6C is not carried; needs validation with another product |
+| Megatone | Search URLs 404; direct product URL returns 200 | Price in JSON-LD only (no cards, no cash); works from Actions |
+| Rodo | 200, no prices in initial HTML (JS-rendered) | No usable endpoint found |
+| Musimundo | Not VTEX; redirects to a static home linking to On City | No catalog endpoint |
+| Fravega | **BLOCKED** 403 CloudFront (works locally) | No evasion |
+| MejoresCompras | **BLOCKED** 403 Cloudflare "Just a moment..." challenge (works locally) | No captcha solving |
+
+Cash price: the VTEX checkout simulation (POST /api/checkout/pub/orderForms/simulation, postal code 5000) on On City, Cetrogar and Carrefour shows every payment method (incl. "Transferencia Bancaria - Con descuento adicional", "Efectivo", debit) totals exactly the published price: no extra cash discount is exposed anonymously. Fravega/Megatone pages show only a generic "descuento".
+
+### 10.2 Decisions
+
+| Item | Change | S-xx |
+|------|--------|------|
+| R-01 | Recorded as **materialised**: 2 of 9 sources blocked (Fravega, MejoresCompras). Mitigation: no evasion (RNF-07), per-store degradation (RNF-12, RF-15), JSON endpoints where they exist, drop unviable stores (S-28). | S-35 |
+| RF-04 / RF-07 / Q-01 / R-02 | Mercado Libre via MejoresCompras is **not viable from Actions** and leaves the v1 measured set (supersedes S-27, S-17; the ML-specific parts of S-30 and S-32 lapse). RF-07 loses the daily-ML exception. "sin datos" without failing the run holds for any blocked store. Alternatives are open points for the DRT: official Mercado Libre API (unverified), manual price entry, self-hosted/other-IP runner (breaks zero-cost serverless). | S-35 |
+| RF-04 | Current list (shrink clause S-28): On City, Cetrogar, Carrefour, Naldo (provisional), Megatone (direct product URL only). Fravega, Rodo, Musimundo, Mercado Libre moved to candidates / out of the v1 measured set with reasons (DAF sections 2.2 and 3). Adapter extensibility (RF-05) and config-file URLs per store (RF-19) kept; no search by name. | S-36 |
+| RF-20 / RN-10 / RN-14 / RF-21 | Anonymous sources expose cash = published price; condition = payment method with discount 0 %. Data model still carries `descuento_pct` > 0 if a store exposes one. Numeric examples unchanged; RF-21 text clarified (compares one-payment price vs interest-free installment total at present value). | S-37 |
+| RF-04 | Carrefour seller selection: discard price 0 / no stock; if several remain, lowest price (provisional). | S-38 |
+| RF-04 / RF-03 | Megatone: direct URL adapter only, price only (list = cash, cards "sin datos"). | S-39 |
+| RF-04 | Naldo kept as provisional; validate with another product, otherwise drop. | S-40 |
+| DAF 15.2 | New DRT questions 14 to 18 (VTEX simulation as cash source, Carrefour seller, Megatone URL-only adapter, Naldo validation, alternative Mercado Libre source); question 7 replaced. | - |
+
+### 10.3 Open points for the DRT (added)
+
+1. VTEX checkout simulation as the cash source (stability, postal code, payment-method identification, fallback).
+2. Seller selection for Carrefour.
+3. Megatone URL-only adapter (JSON-LD).
+4. Naldo validation with another product.
+5. Alternative Mercado Libre source (official API unverified / manual entry / other-IP runner) and re-evaluation of Fravega, Rodo, Musimundo.
