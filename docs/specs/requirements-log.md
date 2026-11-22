@@ -214,3 +214,44 @@ Cash price: the VTEX checkout simulation (POST /api/checkout/pub/orderForms/simu
 3. Megatone URL-only adapter (JSON-LD).
 4. Naldo validation with another product.
 5. Alternative Mercado Libre source (official API unverified / manual entry / other-IP runner) and re-evaluation of Fravega, Rodo, Musimundo.
+
+## Round 11 - DRT alignment
+
+Source: DRT v0.1 (section 20.3, defects D-01 to D-12) and ADRs 0003, 0006 to 0010, 0013, 0014; robots.txt checks verified 2026-11-22. DAF bumped to v0.5. No new facts from the owner: everything below is either verified evidence (robots.txt, BCRA API) or an **Assumption (Claude)** (S-41 to S-52). Where the DRT and the DAF disagree, the DAF text prevails and the point is listed under 11.3.
+
+### 11.1 Verified evidence
+
+| Topic | Fact |
+|-------|------|
+| Cetrogar | robots.txt: `Disallow: /api/` and `/checkout/` for all agents. The VTEX JSON API is not used. |
+| On City | robots.txt: `Disallow: /*checkout*`. The VTEX catalog API is allowed; the checkout simulation is not. Catalog 1-payment lines list debit methods (Cabal Debito, Maestro, Visa Electron), not bank transfer. |
+| Carrefour, Naldo | robots.txt allows catalog and checkout simulation. Carrefour is a marketplace (three third-party products/sellers plus CARREFOUR at price 0 in the spike). |
+| BCRA API | Only the median 12-month expected inflation (variable 29, monthly, % year-over-year) is published through the API; the monthly expectations vector exists only in XLSX. |
+
+### 11.2 Decisions (all Assumption, Claude)
+
+| Defect / item | Change | S-xx |
+|---------------|--------|------|
+| D-01 | Cetrogar becomes provisional; HTML product page to be validated in F1; otherwise dropped. RF-04, sections 2.2, 3, 10, 12, glossary. | S-43 |
+| D-02 | Checkout simulation is not the cash source at On City / Cetrogar; cash comes from catalog 1-payment lines; simulation optional at Carrefour / Naldo. RF-20, RF-04, S-37 reworded. | S-42 |
+| D-03 | RF-20 example corrected: On City -> {debito, 0 %} (no bank transfer). | S-42 |
+| D-04 | S-07 reworded: constant monthly `r` from variable 29; `h` averaging deferred; RF-21 definitions and REM source reworded, numeric examples unchanged (given `r`); new criterion with A = 21.8 %. | S-41 |
+| D-05 | S-38 reworded per ADR-0006 (marketplace, seller rule, same seller for installments and cash, unverified Mastercard 3x origin). | S-38 |
+| D-06 | "Precio de lista" = VTEX `Price`; `ListPrice` not used. RF-03, glossary, RF-20. | S-44 |
+| D-07 | RNF-15 cause list extended; issues auto-close. | S-51 |
+| D-08 | R-04: notice at 45 days of inactivity instead of "cannot notify". | S-47 |
+| D-09 | RF-07 adds the "sin oferta" result. | S-52 |
+| D-10 | RF-24: closed-series growth accepted; purge trigger > 500 closed series. | S-48 |
+| D-11 | History rule narrowed: failures are not history points (section 9, RF-24, RF-15). | S-48 |
+| D-12 | RF-23: Telegram implemented, email deferred (partial coverage). | S-49 |
+| Extra | RNF-07: robots.txt enforced at runtime (also for APIs), ToS reviewed manually before F3. | S-45, S-46 |
+| Extra | RNF-08: automated checks static; contrast and screen reader tested manually. | S-50 |
+
+### 11.3 Disagreements left for the owner (DAF kept or open)
+
+1. **DAF S-37 evidence vs DRT:** the DAF keeps "cash = published price" as a spike finding (simulation showed all methods equal the published price) but no longer relies on the simulation; the DRT's catalog-line rule yields the same value (0 %). No functional conflict, only the source differs.
+2. **S-41:** a median 12-month year-over-year expectation converted to a monthly rate is applied to all installment counts (DRT ST-10). It is an approximation (for short plans the near-term expectation may differ). The DAF accepts it for v1; owner should confirm.
+3. **D-10:** the DAF rule "always keep the last point of each series" is kept (DRT also keeps it and defers the purge); unbounded closed-series growth is documented and accepted instead of changed.
+4. **RF-23:** the DAF keeps "Telegram or email" as the requirement and records email as a deferred Could; the DRT's `canal: email` rejection in the schema is stated in the DAF as a validation failure (not confirmed in the DRT schema text).
+5. **Issue auto-close (DRT ST-11)** and the cause keys are imported into RNF-15 as Assumption S-51; the list is declared open.
+6. **Carrefour Mastercard 3x** (generic vs "Tarjeta Carrefour Mastercard") remains unverified until the F1 fixture; if it is the store-brand card, Carrefour has no eligible card series.
