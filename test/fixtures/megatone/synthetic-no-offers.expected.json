@@ -1,0 +1,7 @@
+{
+  "outcome": "falla",
+  "failure": {
+    "kind": "parse",
+    "detail": "the JSON-LD offers are missing or too many"
+  }
+}

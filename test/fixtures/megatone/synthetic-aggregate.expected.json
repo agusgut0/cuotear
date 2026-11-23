@@ -1,0 +1,14 @@
+{
+  "outcome": "ok",
+  "listaCents": 150000050,
+  "contado": {
+    "valorCents": 150000050,
+    "medio": "ninguno",
+    "descuentoPct": null
+  },
+  "tarjetas": {
+    "visa": null,
+    "mastercard": null,
+    "naranja": null
+  }
+}

@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { formatIssue, validateConfig, validateConfigFile } from '../../src/config/validate.js';
+import { stores } from '../../src/stores/index.js';
 import { checkVtexProductUrl } from '../../src/stores/url.js';
+
+const ACTIVE = stores.map((store) => store.id).join(', ');
 
 /** @param {number} i */
 const productYaml = (i) => `  - id: producto-${i}
@@ -81,7 +84,7 @@ describe('RF-19: base configuration', () => {
     const [error] = errorsOf(yaml);
     assert.equal(
       error && formatIssue(error),
-      'config/cuotear.yaml:6:7 productos[0].urls.fravega: tienda no permitida (vigentes: oncity)',
+      `config/cuotear.yaml:6:7 productos[0].urls.fravega: tienda no permitida (vigentes: ${ACTIVE})`,
     );
   });
 });
@@ -143,7 +146,7 @@ productos:
   });
 
   test('a store that is not in the registry fails', () => {
-    assertFails(configWith(1).replace('oncity:', 'fravega:'), /tienda no permitida \(vigentes: oncity\)/);
+    assertFails(configWith(1).replace('oncity:', 'fravega:'), new RegExp(`tienda no permitida \\(vigentes: ${ACTIVE}\\)`));
   });
 
   test('a domain that is not in the adapter allowlist fails', () => {

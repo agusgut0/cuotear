@@ -433,7 +433,7 @@ Interpretación:
   - `InterestRate === 0` y `NumberOfInstallments >= 2`; se toma la de **mayor n** (S-04); empate de n → menor total.
   - `T = TotalValuePlusInterestRate`, `C = Value`. Si `|T − n × C| > n` pesos ⇒ `{invalida}` (RF-14).
   - Sin coincidencias ⇒ `null` ("sin datos" sin falla).
-  - **No verificado:** si la Mastercard 3x de Carrefour del spike proviene de "Mastercard" o de "Tarjeta Carrefour Mastercard" (el spike usó una regex amplia). Si fuera la segunda, Carrefour quedaría sin tarjetas elegibles. Se resuelve con el fixture de F1.
+  - **Verificado en F3 (2026-11-23):** los fixtures reales de Carrefour traen tanto "Mastercard" (genérica) como "Tarjeta Carrefour Mastercard" como medios distintos; solo la genérica cuenta. En el TCL 75T6C del vendedor DMAKER ninguna tarjeta tiene cuotas sin interés (todas `null`); con el vendedor Juan Duran hay Visa y Mastercard 12x sin interés. El conjunto "solo Mastercard 3x" del spike ya no aparece (los precios y promos cambiaron); se cubre con un caso derivado en el test.
 - **Contado (RF-20, S-37, Q-14):**
   - Candidatos = líneas de `Installments` con `NumberOfInstallments === 1` del vendedor elegido, cuyo medio normalizado clasifica como: `transferencia` (contiene "transferencia"), `efectivo` (contiene "efectivo"), `debito` (contiene "debito"/"debit", o es "maestro" o "visa electron"). Medios de crédito, billeteras y marcas de tienda/banco no son candidatos (RN-14).
   - Si hay simulación habilitada y responde: se agregan como candidatos los totales de 1 pago de `paymentData.installmentOptions` por medio (descontando el ítem `Shipping` de `totals` si existiera), con la misma clasificación.
@@ -444,7 +444,9 @@ Interpretación:
 - **Simulación:** su falla (cualquier clase) **nunca** marca falla: se usa solo el catálogo. Se registra en el log.
 - Pedidos por URL: 1 (On City, Naldo sin simulación) o 2 (Carrefour, Naldo con simulación).
 
-Perfiles (datos, no código): `oncity {hosts:['www.oncity.com'], simulacion:false, status:'vigente'}`, `carrefour {hosts:['www.carrefour.com.ar'], simulacion:true, status:'vigente'}`, `naldo {hosts:['www.naldo.com.ar'], simulacion:true, status:'provisional'}`.
+Perfiles (datos, no código): `oncity {hosts:['www.oncity.com'], simulacion:false, status:'vigente'}`, `carrefour {hosts:['www.carrefour.com.ar'], simulacion:false, status:'vigente'}`, `naldo {hosts:['www.naldo.com.ar'], simulacion:false, status:'provisional'}`.
+
+**Supuesto (F3, simulación de checkout):** la simulación opcional **no se implementa** en v1. El spike mostró que no agrega descuento de contado respecto del catálogo, así que todos los perfiles quedan con `simulacion: false` (el adaptador rechaza `true`). Las menciones a la simulación en esta sección quedan como diseño diferido, sin efecto en v1.
 
 ### 6.3 Adaptador Megatone (solo URL directa, S-39, Q-16)
 
@@ -454,11 +456,14 @@ Perfiles (datos, no código): `oncity {hosts:['www.oncity.com'], simulacion:fals
 - Precio: número, o string `^\d+(\.\d{1,2})?$` (formato schema.org con punto decimal). Cualquier otro formato (p. ej. con separadores de miles) ⇒ `falla` `parse` (**Supuesto** ST-05: el formato exacto se fija con el fixture de F1; el spike mostró 2.299.999 pero su regex aceptaba ambos formatos).
 - `availability` `OutOfStock`/`Discontinued`/`SoldOut` o precio 0 ⇒ `sin_stock`.
 - Salida: `listaCents = precio`, `contado = {valorCents: precio, medio: 'ninguno', descuentoPct: null}`, tarjetas `null` (RF-03).
+- **Supuesto** ST-15 (F3): la ficha real (capturada el 2026-11-23) trae el precio como string `"2299999.00"` con `InStock`, sin cuotas ni descuento de contado; se confirma ST-05. El adaptador implementa: varias ofertas ⇒ menor precio entre las disponibles (como ADR-0006); `offers` ausente, sin precio, con moneda distinta de ARS o JSON-LD sin `Product` ⇒ `falla` `parse` (nunca `sin_stock` por dato faltante). `tarjetas` es `{visa: null, mastercard: null, naranja: null}` (sin datos, degradada) y `contado` = lista con `medio: 'ninguno'` (como VTEX sin candidatos). La ficha se pide siempre como `/producto/<slug>/` (con barra final, sin query ni fragmento). `fixtures:capture` guarda solo el JSON-LD `Product`.
 
 ### 6.4 Cetrogar (provisional por robots.txt) y Naldo (provisional por catálogo)
 
 - **Cetrogar** (ADR-0007): la API VTEX está prohibida por robots.txt. En F1 se captura la ficha HTML `/<slug>/p` (permitida) y se evalúa: (a) JSON-LD `Product` con precio → al menos lista/contado como Megatone; (b) datos embebidos con cuotas por tarjeta (si existieran, se extraen con el mismo criterio de 6.2). Si (a) no se cumple, Cetrogar se **retira** (S-28) con decisión registrada en DAF y log. Hasta entonces su id está en el registro con `status: 'provisional'`.
+  - **Supuesto (F3):** Cetrogar queda **fuera de v1** hasta que exista un adaptador HTML. No hay perfil ni fixture, no se hace ningún pedido a `/api/` de Cetrogar y ninguna configuración ni test lo referencia como tienda activa (su id no está en el registro, por lo que sus URLs son inválidas en la configuración).
 - **Naldo** (S-40, Q-17): en F1 el dueño elige un producto que Naldo tenga en stock y se captura el fixture (catálogo + simulación). Criterio de validación: el adaptador VTEX devuelve lista y al menos una serie de tarjeta o contado sin cambios de código. Si falla o no se hace antes del cierre de F3, Naldo se retira (S-28).
+  - **Supuesto (F3):** Naldo no ofrece el TCL 75T6C (el catálogo no devuelve producto). El adaptador VTEX se validó, sin cambios de código, con un TCL en stock (75A400U, capturado el 2026-11-23): lista, contado (débito, 0 %) y las tres tarjetas a 6 cuotas sin interés. Como no es el producto del caso, Naldo sigue `provisional`.
 
 ### 6.5 Pruebas de contrato con fixtures
 
@@ -893,6 +898,7 @@ Pie de página: última ejecución, tiendas con falla, avisos abiertos (sin deta
 | ST-12 | Idioma por URL, sin preferencia guardada. | 14.4 |
 | ST-13 | Clasificación de medios de 1 pago por nombre (transferencia/efectivo/débito; Maestro y Visa Electron = débito). | 6.2 |
 | ST-14 | robots.txt se aplica también a las APIs JSON de las tiendas (interpretación estricta de RNF-07). | 5.1 |
+| ST-15 | Megatone: sin dato de precio u oferta ⇒ `parse` (no `sin_stock`); varias ofertas ⇒ menor precio disponible; contado = lista, `medio: ninguno`. | 6.3 |
 
 ### 20.3 Acciones documentales (no hechas en este DRT)
 
@@ -939,7 +945,7 @@ Cada fase termina con PRs pequeños, CI en verde y la documentación (DAF/DRT/AD
 
 ### Después del MVP
 
-- **F3 — Resto de tiendas:** perfiles `carrefour` (simulación habilitada) y `naldo`; adaptador `megatone`; `cetrogar` según F1; selección de vendedor; avisos `robots:<tienda>` y `todas-tiendas-fallan`. Revisión de ToS por el dueño (cierre de Naldo/Cetrogar).
+- **F3 — Resto de tiendas:** perfiles `carrefour` y `naldo` (VTEX, sin simulación de checkout: **Supuesto**, ver 6.2; Cetrogar fuera de v1 hasta un adaptador HTML, ver 6.4); adaptador `megatone`; `cetrogar` según F1; selección de vendedor; avisos `robots:<tienda>` y `todas-tiendas-fallan`. Revisión de ToS por el dueño (cierre de Naldo/Cetrogar).
 - **F4 — Alertas y avisos:** `core/rules` (todos los criterios de RF-22, RN-12, RN-13), Telegram (escape, partición, ritmo, dedupe, pendientes), `ops-issues` (todas las causas), disponibilidad (RNF-10), inactividad (R-04).
 - **F5 — REM, inglés y accesibilidad:** inflación REM (BCRA v4, variable 29) con respaldo; i18n `en` completo y mensajes de alerta en `en`; revisión WCAG 2.2 AA manual (teclado, lector de pantalla, contraste) + `html-validate`.
 - **F6 — Endurecimiento:** límites de tamaño del historial (45/50/100 MB) con tests, CodeQL opcional, revisión de permisos y SHAs, guía "agregar una tienda" en README, traducción del DRT al inglés al cerrar la fase (CLAUDE.md).
