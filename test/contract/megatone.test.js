@@ -4,7 +4,7 @@ import { describe, test } from 'node:test';
 import { createFetchContext } from '../../src/http/client.js';
 import { stores } from '../../src/stores/index.js';
 import { parsePrice } from '../../src/stores/megatone/index.js';
-import { trimProductJsonLd } from '../../src/stores/megatone/jsonld.js';
+import { MAX_BLOCK_CHARS, MAX_BLOCKS, parseJsonLdBlocks, trimProductJsonLd } from '../../src/stores/megatone/jsonld.js';
 import { fakeClock, fakeFetch, HTML_HEADERS } from '../helpers/fake-http.js';
 import { failure, fixtureContext, htmlOk, jsonOk } from '../helpers/fixture-context.js';
 
@@ -75,6 +75,67 @@ describe('Megatone contract: real fixture (TCL 75T6C, captured 2026-11-23)', () 
     const trimmed = trimProductJsonLd(page);
     assert.ok(trimmed.includes('"offers"') && !trimmed.includes('description') && !trimmed.includes('BreadcrumbList') && !trimmed.includes('other'));
   });
+
+  test('the capture trimming whitelists the fields of each offer', () => {
+    const offers = [
+      { '@type': 'Offer', price: '1.00', priceCurrency: 'ARS', availability: 'https://schema.org/InStock', seller: { name: 'private' }, url: 'https://x.example/?token=1' },
+      { '@type': 'AggregateOffer', lowPrice: '2.00', priceCurrency: 'ARS', offerCount: 3 },
+    ];
+    const page = `<script type="application/ld+json">${JSON.stringify({ '@type': 'Product', name: 'x', offers })}</script>`;
+    const kept = trimProductJsonLd(page);
+    assert.ok(!/seller|token|offerCount/.test(kept));
+    const json = JSON.parse(/<script[^>]*>([\s\S]*?)<\/script>/.exec(kept)?.[1] ?? 'null');
+    assert.deepEqual(json.offers, [
+      { '@type': 'Offer', price: '1.00', priceCurrency: 'ARS', availability: 'https://schema.org/InStock' },
+      { '@type': 'AggregateOffer', lowPrice: '2.00', priceCurrency: 'ARS' },
+    ]);
+  });
+});
+
+describe('Megatone JSON-LD scanner: hostile pages finish fast (no ReDoS)', () => {
+  const MIB = 1024 * 1024;
+  const BUDGET_MS = 1000;
+  const cases = /** @type {[string, string][]} */ ([
+    ['repeated "<script " without ">"', '<script '.repeat(Math.ceil(MIB / 8))],
+    ['repeated unclosed ld+json script tags', '<script type="application/ld+json">'.repeat(Math.ceil(MIB / 35))],
+    ['repeated unclosed ld+json blocks with text', '<script type="application/ld+json">{"a":1}'.repeat(Math.ceil(MIB / 40))],
+    ['many tiny blocks', '<script type="application/ld+json">{}</script>'.repeat(Math.ceil(MIB / 45))],
+    ['repeated "</script" without ">"', `<script type="application/ld+json">${'</script '.repeat(Math.ceil(MIB / 9))}`],
+    ['huge unquoted attribute run', `<script ${'type=x '.repeat(Math.ceil(MIB / 7))}`],
+  ]);
+
+  for (const [name, html] of cases) {
+    test(`${name}: parser returns within budget and the adapter reports a parse failure`, async () => {
+      assert.ok(html.length >= MIB);
+      let started = performance.now();
+      const parsed = parseJsonLdBlocks(html);
+      assert.ok(performance.now() - started < BUDGET_MS, 'parseJsonLdBlocks too slow');
+      assert.ok(parsed.values.length <= MAX_BLOCKS);
+
+      started = performance.now();
+      const result = await megatone.measure(fixtureContext(htmlOk(html)).ctx, PRODUCT_URL, OPTIONS);
+      assert.ok(performance.now() - started < BUDGET_MS, 'measure too slow');
+      assert.equal(result.outcome, 'falla');
+      assert.equal(result.failure?.kind, 'parse');
+    });
+  }
+
+  test('quoted, single-quoted and unquoted type attributes are all accepted, case-insensitively', () => {
+    const html = [
+      '<script type="application/ld+json">{"n":1}</script>',
+      "<script type='application/ld+json'>{\"n\":2}</script>",
+      '<script type=application/ld+json>{"n":3}</script>',
+      '<SCRIPT TYPE="Application/LD+JSON">{"n":4}</SCRIPT >',
+      '<script type="text/javascript">{"n":5}</script>',
+      '<scripts type="application/ld+json">{"n":6}</scripts>',
+    ].join('\n');
+    assert.deepEqual(parseJsonLdBlocks(html).values, [{ n: 1 }, { n: 2 }, { n: 3 }, { n: 4 }]);
+  });
+
+  test('an oversized block is skipped and counted, later blocks are still read', () => {
+    const html = `<script type="application/ld+json">"${'x'.repeat(MAX_BLOCK_CHARS)}"</script><script type="application/ld+json">{"ok":true}</script>`;
+    assert.deepEqual(parseJsonLdBlocks(html), { values: [{ ok: true }], skipped: 1 });
+  });
 });
 
 describe('Megatone contract: URL validation (direct product page only)', () => {
@@ -144,6 +205,24 @@ describe('Megatone contract: synthetic edge cases', () => {
     assert.equal(parsePrice('1e5'), null);
     assert.equal(parsePrice(Number.NaN), null);
     assert.equal(parsePrice(undefined), null);
+  });
+
+  test('both local price formats ("2.299.999,00" and "2,299,999.00") are parse failures, not a wrong price', async () => {
+    assert.equal(parsePrice('2,299,999.00'), null);
+    for (const price of ['2.299.999,00', '2,299,999.00']) {
+      const page = `<script type="application/ld+json">${JSON.stringify({ '@type': 'Product', offers: { '@type': 'Offer', priceCurrency: 'ARS', price, availability: 'https://schema.org/InStock' } })}</script>`;
+      const result = await megatone.measure(fixtureContext(htmlOk(page)).ctx, PRODUCT_URL, OPTIONS);
+      assert.equal(result.outcome, 'falla', price);
+      assert.equal(result.failure?.kind, 'parse', price);
+    }
+  });
+
+  test('a cheaper OutOfStock offer never beats a dearer InStock one', async () => {
+    const offer = (/** @type {string} */ price, /** @type {string} */ availability) => ({ '@type': 'Offer', priceCurrency: 'ARS', price, availability: `https://schema.org/${availability}` });
+    const page = `<script type="application/ld+json">${JSON.stringify({ '@type': 'Product', offers: [offer('1000.00', 'OutOfStock'), offer('2000.00', 'InStock')] })}</script>`;
+    const result = await megatone.measure(fixtureContext(htmlOk(page)).ctx, PRODUCT_URL, OPTIONS);
+    assert.equal(result.outcome, 'ok');
+    assert.equal(result.listaCents, 2000 * 100);
   });
 
   test('injection text in the store data never reaches the result (RN-01)', async () => {
