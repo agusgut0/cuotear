@@ -29,3 +29,4 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run validate-config
+      - run: npm run validate-site
