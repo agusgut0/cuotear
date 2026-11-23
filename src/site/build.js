@@ -18,6 +18,8 @@ import { detailPage, homePage, notFoundPage } from './pages.js';
  * @property {boolean} usingFallbackConfig the repository configuration is invalid (RF-19)
  * @property {Record<string, string>} storeNames store id -> display name (trusted, from the code)
  * @property {readonly string[]} failingStores stores with failed URLs in this run
+ * @property {number | null} [availability] percent of the scheduled runs that succeeded in 30 days (DRT 18.3); null or absent when unknown
+ * @property {number} [openNotices] open operational notices (DRT 18.4); the count only, never the technical detail
  */
 
 const PRODUCT_ID = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;

@@ -30,5 +30,13 @@ export function computeCauses(reports) {
 export function causeText(cause) {
   if (cause === ALL_STORES_FAIL) return 'every measured URL failed; the site keeps the previous data';
   if (cause.startsWith(ROBOTS_PREFIX)) return 'robots.txt forbids, or could not be read for, a configured URL of this store; no product request was made';
-  return 'operational notice';
+  const fixed = /** @type {Record<string, string>} */ ({
+    'secretos-canal': 'the alert channel secrets are missing or invalid (or Telegram rejected the token); no alert is sent',
+    'config-invalida': 'the repository configuration is invalid; the last valid configuration is used',
+    'config-ausente': 'there is no valid configuration; nothing is measured or published',
+    'commit-conflicto': 'the history commit could not be pushed; the next run recomputes it',
+    inactividad: 'the repository has no commits for more than 45 days; scheduled runs may be suspended',
+    disponibilidad: 'the availability of the scheduled runs in the last 30 days is below 95 %',
+  });
+  return fixed[cause] ?? 'operational notice';
 }

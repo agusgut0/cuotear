@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, test } from 'node:test';
 import { emptyState, isRunState } from '../../src/state/schema.js';
 import { loadState, saveState } from '../../src/state/store.js';
@@ -119,5 +119,103 @@ describe('run state (DRT 9, ADR-0004)', () => {
     const first = loadState('does/not/exist.json').state;
     first.series['x|y/contado'] = { failures: 9 };
     assert.deepEqual(loadState('does/not/exist.json').state.series, {});
+  });
+});
+
+describe('run state: fields added in F4 (compatible extension of version 1)', () => {
+  const hash = `sha256:${'b'.repeat(64)}`;
+
+  test('products and the new ops fields round-trip', () => {
+    withStateFile((path) => {
+      const state = {
+        ...fullState(),
+        products: { 'tcl-75t6c': { configHash: hash, s: 1, r: 0.025 }, 'sin-tasa': { configHash: hash, s: 0, r: null } },
+        ops: { lastCauses: ['inactividad'], measuredStores: ['oncity'], commitConflict: false, channelBroken: true, availability: { value: 97.5, at: '2026-11-22T12:17:41Z' } },
+      };
+      saveState(/** @type {any} */ (state), path);
+      assert.deepEqual(loadState(path).state, state);
+    });
+  });
+
+  test('a state written before F4 (no products, plain ops) still loads, and the product memory is simply absent', () => {
+    withStateFile((path) => {
+      saveState(fullState(), path);
+      const loaded = loadState(path);
+      assert.equal(loaded.rebuilt, false);
+      assert.equal(loaded.state.products, undefined);
+      assert.equal(loaded.state.eligible['tcl-75t6c']?.length, 2, 'the rest of the state is kept');
+    });
+  });
+
+  test('invalid values are refused (a hand-edited or corrupt cache is a loss, never trusted)', () => {
+    const valid = { ...fullState(), products: { a: { configHash: hash, s: 1, r: 0.01 } } };
+    assert.equal(isRunState(valid), true);
+    assert.equal(isRunState({ ...valid, products: { a: { configHash: 'x', s: 1, r: 0.01 } } }), false);
+    assert.equal(isRunState({ ...valid, products: { a: { configHash: hash, s: 2, r: 0.01 } } }), false);
+    assert.equal(isRunState({ ...valid, products: { a: { configHash: hash, s: 1, r: -1 } } }), false);
+    assert.equal(isRunState({ ...valid, products: { a: { configHash: hash, s: 1 } } }), false);
+    assert.equal(isRunState({ ...valid, ops: { lastCauses: [], availability: { value: 101, at: '2026-11-22T12:17:41Z' } } }), false);
+    assert.equal(isRunState({ ...valid, ops: { lastCauses: [], extra: 1 } }), false);
+  });
+});
+
+describe('run state: bounds and patterns of what a cache can inject (S1, S3)', () => {
+  /** @param {Partial<import('../../src/state/schema.js').RunState>} extra @returns {import('../../src/state/schema.js').RunState} */
+  const withExtra = (extra) => ({ ...fullState(), ...extra });
+
+  test('S1: every valid cause key is accepted in ops.lastCauses', () => {
+    const causes = ['todas-tiendas-fallan', 'secretos-canal', 'config-invalida', 'config-ausente', 'historial-45mb', 'historial-100mb', 'commit-conflicto', 'inactividad', 'disponibilidad', 'robots:oncity', 'robots:mega-tone2'];
+    assert.equal(isRunState(withExtra({ ops: { lastCauses: causes, measuredStores: ['oncity', 'carrefour'] } })), true);
+  });
+
+  test('S1: a cause that is not a known key (or carries a line break or a workflow command) invalidates the state', () => {
+    for (const cause of ['robots:x\n::error::pwned', '::error::x', 'inactividad\n', 'robots:UPPER', 'robots:a', 'robots:' + 'a'.repeat(31), 'desconocida', '']) {
+      assert.equal(isRunState(withExtra({ ops: { lastCauses: [cause] } })), false, JSON.stringify(cause));
+    }
+  });
+
+  test('S1: measuredStores must be store ids', () => {
+    for (const store of ['x\n::error::bad', 'A', 'a', 'a'.repeat(31), 'with space']) {
+      assert.equal(isRunState(withExtra({ ops: { lastCauses: [], measuredStores: [store] } })), false, JSON.stringify(store));
+    }
+  });
+
+  test('S1: a state with a forged cause loads as lost (rebuilt), like any other invalid state', () => {
+    withStateFile((path) => {
+      saveState(fullState(), path);
+      const forged = { ...fullState(), ops: { lastCauses: ['robots:x\n::error::pwned'] } };
+      writeFileSync(path, JSON.stringify(forged));
+      const loaded = loadState(path);
+      assert.equal(loaded.rebuilt, true);
+      assert.equal(loaded.reason, 'invalid_schema');
+      assert.deepEqual(loaded.state.ops.lastCauses, []);
+    });
+  });
+
+  test('S2: sentAlertIds ids must be safe to log', () => {
+    assert.equal(isRunState(withExtra({ sentAlertIds: [{ id: 'a'.repeat(64), at: '2026-11-22T12:17:41Z' }] })), true);
+    for (const id of ['', 'a\nb', 'a b', 'a'.repeat(101), '<b>']) {
+      assert.equal(isRunState(withExtra({ sentAlertIds: [{ id, at: '2026-11-22T12:17:41Z' }] })), false, JSON.stringify(id));
+    }
+  });
+
+  test('S3: pendingAlerts holds at most 200 and sentAlertIds at most 2000', () => {
+    assert.equal(isRunState(withExtra({ pendingAlerts: Array.from({ length: 200 }, () => ({})) })), true);
+    assert.equal(isRunState(withExtra({ pendingAlerts: Array.from({ length: 201 }, () => ({})) })), false);
+    const sent = (/** @type {number} */ count) => Array.from({ length: count }, (_, index) => ({ id: `id${index}`, at: '2026-11-22T12:17:41Z' }));
+    assert.equal(isRunState(withExtra({ sentAlertIds: sent(2000) })), true);
+    assert.equal(isRunState(withExtra({ sentAlertIds: sent(2001) })), false);
+  });
+
+  test('a state saved before F4 (no products, no availability) still loads and is not rebuilt', () => {
+    withStateFile((path) => {
+      const old = /** @type {Record<string, unknown>} */ ({ ...fullState() });
+      delete old.products;
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, JSON.stringify(old));
+      const loaded = loadState(path);
+      assert.equal(loaded.rebuilt, false);
+      assert.equal(loaded.state.products, undefined);
+    });
   });
 });

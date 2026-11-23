@@ -83,6 +83,15 @@ export function validateSemantics(config, registry) {
   config.productos.forEach((product, index) => {
     const base = ['productos', index];
 
+    if (Object.hasOwn(Object.prototype, product.id)) {
+      // Ids become keys of plain objects in the run state: these names would read or shadow Object.prototype.
+      errors.push({
+        path: [...base, 'id'],
+        atKey: false,
+        message: `id de producto reservado "${product.id}" (coincide con una propiedad interna de JavaScript; elegí otro id)`,
+      });
+    }
+
     const firstIndex = productIds.get(product.id);
     if (firstIndex === undefined) {
       productIds.set(product.id, index);
