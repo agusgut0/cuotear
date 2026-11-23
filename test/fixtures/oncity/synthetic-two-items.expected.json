@@ -1,0 +1,7 @@
+{
+  "outcome": "falla",
+  "failure": {
+    "kind": "ambiguous",
+    "detail": "the product has several items and none matches the skuId of the URL"
+  }
+}

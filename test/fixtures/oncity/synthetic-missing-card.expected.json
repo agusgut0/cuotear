@@ -1,0 +1,22 @@
+{
+  "outcome": "ok",
+  "listaCents": 100000000,
+  "contado": {
+    "valorCents": 100000000,
+    "medio": "debito",
+    "descuentoPct": 0
+  },
+  "tarjetas": {
+    "visa": {
+      "n": 10,
+      "cuotaCents": 10000000,
+      "totalCents": 100000000
+    },
+    "mastercard": {
+      "n": 6,
+      "cuotaCents": 16666667,
+      "totalCents": 100000000
+    },
+    "naranja": null
+  }
+}

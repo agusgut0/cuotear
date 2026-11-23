@@ -1,0 +1,7 @@
+{
+  "outcome": "falla",
+  "failure": {
+    "kind": "parse",
+    "detail": "the catalog response is not valid JSON"
+  }
+}

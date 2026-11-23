@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=./cuotear.schema.json
+version: 1
+alertas:
+  canal: telegram # telegram | ninguno
+  idioma: es-AR # es-AR | en
+  reglas: # globales; cada producto puede reemplazar por regla
+    baja_minima_pct: 5
+    cambio_mejor_opcion: true
+comparacion:
+  s: 1 # mes de la primera cuota: 0 o 1
+  inflacion:
+    fuente: manual # rem | manual (rem llega en una fase posterior)
+    manual:
+      periodo: mensual # mensual | anual
+      pct: 2.5 # porcentaje mensual, >= 0 (valor manual de ejemplo: ajustalo)
+productos:
+  - id: tcl-75t6c
+    nombre: 'Smart TV TCL 75" 75T6C'
+    urls:
+      oncity: https://www.oncity.com/smart-tv-qled-google-tcl-75--uhd-4k-3840-x-2160-75t6c-158450/p

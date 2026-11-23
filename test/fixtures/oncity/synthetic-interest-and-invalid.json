@@ -1,0 +1,56 @@
+[
+  {
+    "productId": "1",
+    "productName": "Synthetic TV 75",
+    "linkText": "synthetic-tv-75",
+    "items": [
+      {
+        "itemId": "1",
+        "name": "Item 1",
+        "sellers": [
+          {
+            "sellerId": "1",
+            "sellerName": "Seller 1",
+            "sellerDefault": true,
+            "commertialOffer": {
+              "Price": 1000000,
+              "ListPrice": 1000000,
+              "AvailableQuantity": 4,
+              "IsAvailable": true,
+              "Installments": [
+                {
+                  "PaymentSystemName": "Visa",
+                  "NumberOfInstallments": 12,
+                  "Value": 90000,
+                  "TotalValuePlusInterestRate": 1080000,
+                  "InterestRate": 12.5
+                },
+                {
+                  "PaymentSystemName": "Mastercard",
+                  "NumberOfInstallments": 12,
+                  "Value": 100000,
+                  "TotalValuePlusInterestRate": 1300000,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Naranja",
+                  "NumberOfInstallments": 6,
+                  "Value": 100000,
+                  "TotalValuePlusInterestRate": 600000,
+                  "InterestRate": 5
+                },
+                {
+                  "PaymentSystemName": "Naranja",
+                  "NumberOfInstallments": 3,
+                  "Value": 333333.33,
+                  "TotalValuePlusInterestRate": 999999.99,
+                  "InterestRate": 0
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

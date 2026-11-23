@@ -1,0 +1,74 @@
+[
+  {
+    "productId": "1",
+    "productName": "Synthetic TV 75",
+    "linkText": "synthetic-tv-75",
+    "items": [
+      {
+        "itemId": "1",
+        "name": "Item 1",
+        "sellers": [
+          {
+            "sellerId": "9",
+            "sellerName": "Seller 9",
+            "sellerDefault": false,
+            "commertialOffer": {
+              "Price": 1000000,
+              "ListPrice": 1000000,
+              "AvailableQuantity": 4,
+              "IsAvailable": true,
+              "Installments": [
+                {
+                  "PaymentSystemName": "Visa",
+                  "NumberOfInstallments": 10,
+                  "Value": 100000,
+                  "TotalValuePlusInterestRate": 1000000,
+                  "InterestRate": 0
+                }
+              ]
+            }
+          },
+          {
+            "sellerId": "2",
+            "sellerName": "Seller 2",
+            "sellerDefault": false,
+            "commertialOffer": {
+              "Price": 900000,
+              "ListPrice": 900000,
+              "AvailableQuantity": 3,
+              "IsAvailable": true,
+              "Installments": [
+                {
+                  "PaymentSystemName": "Visa",
+                  "NumberOfInstallments": 6,
+                  "Value": 150000,
+                  "TotalValuePlusInterestRate": 900000,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Transferencia Bancaria",
+                  "NumberOfInstallments": 1,
+                  "Value": 900000,
+                  "TotalValuePlusInterestRate": 900000,
+                  "InterestRate": 0
+                }
+              ]
+            }
+          },
+          {
+            "sellerId": "1",
+            "sellerName": "Seller 1",
+            "sellerDefault": true,
+            "commertialOffer": {
+              "Price": 0,
+              "ListPrice": 0,
+              "AvailableQuantity": 0,
+              "IsAvailable": false,
+              "Installments": []
+            }
+          }
+        ]
+      }
+    ]
+  }
+]
