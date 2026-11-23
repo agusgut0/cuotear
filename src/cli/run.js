@@ -24,6 +24,7 @@ async function main(argv) {
 
   const summaryFile = process.env.GITHUB_STEP_SUMMARY;
   const { exitCode } = await runPipeline({
+    debug: process.env.CUOTEAR_DEBUG === '1',
     dryRun: values['dry-run'],
     ...(values.out === undefined ? {} : { outDir: values.out }),
     ...(values.config === undefined ? {} : { configPath: values.config }),

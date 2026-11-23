@@ -61,10 +61,11 @@ async function withDeadline(promise, ms) {
  *   now?: () => number,
  *   budgets?: { storeMs?: number, totalMs?: number },
  *   log?: (message: string) => void,
+ *   debug?: boolean,
  * }} input
  * @returns {Promise<{ measurements: Measurement[], reports: StoreReport[] }>}
  */
-export async function measureProducts({ config, registry, ctx, codigoPostal, now = Date.now, budgets = {}, log = () => {} }) {
+export async function measureProducts({ config, registry, ctx, codigoPostal, now = Date.now, budgets = {}, log = () => {}, debug = false }) {
   const storeMs = budgets.storeMs ?? STORE_BUDGET_MS;
   const totalEnd = now() + (budgets.totalMs ?? TOTAL_BUDGET_MS);
 
@@ -78,7 +79,7 @@ export async function measureProducts({ config, registry, ctx, codigoPostal, now
 
   const tasks = [...byStore].flatMap(([storeId, targets]) => {
     const adapter = registry.find((candidate) => candidate.id === storeId);
-    return adapter === undefined ? [] : [measureStore({ adapter, targets, ctx, codigoPostal, now, storeEnd: now() + storeMs, totalEnd, log })];
+    return adapter === undefined ? [] : [measureStore({ adapter, targets, ctx, codigoPostal, now, storeEnd: now() + storeMs, totalEnd, log, debug })];
   });
   const settled = await Promise.allSettled(tasks);
 
@@ -104,10 +105,11 @@ export async function measureProducts({ config, registry, ctx, codigoPostal, now
  *   storeEnd: number,
  *   totalEnd: number,
  *   log: (message: string) => void,
+ *   debug: boolean,
  * }} input
  * @returns {Promise<{ measurements: Measurement[], report: StoreReport }>}
  */
-async function measureStore({ adapter, targets, ctx, codigoPostal, now, storeEnd, totalEnd, log }) {
+async function measureStore({ adapter, targets, ctx, codigoPostal, now, storeEnd, totalEnd, log, debug }) {
   /** @type {Measurement[]} */
   const measurements = [];
   /** @type {StoreReport} */
@@ -116,7 +118,7 @@ async function measureStore({ adapter, targets, ctx, codigoPostal, now, storeEnd
 
   for (const { productId, url } of targets) {
     const started = now();
-    const pending = Promise.resolve().then(() => adapter.measure(ctx, url, { codigoPostal, log: (message) => log(`[cuotear] ${adapter.id}: ${message}`) }));
+    const pending = Promise.resolve().then(() => adapter.measure(ctx, url, { codigoPostal, ...(debug ? { log: (message) => log(`[cuotear] ${adapter.id}: ${message}`) } : {}) }));
     /** @type {import('../stores/types.js').StoreResult} */
     let result;
     try {

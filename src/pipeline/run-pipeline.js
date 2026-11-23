@@ -29,6 +29,7 @@ import { bestForState, buildView } from './view.js';
  * @property {() => Date} [clock]
  * @property {{ storeMs?: number, totalMs?: number }} [budgets]
  * @property {(line: string) => void} [log]
+ * @property {boolean} [debug] also log adapter debug messages (unrecognized payment names)
  * @property {string} [summaryFile] file that receives the markdown summary (`$GITHUB_STEP_SUMMARY`)
  *
  * @typedef {Object} RunOutcome
@@ -52,6 +53,7 @@ export async function runPipeline(options = {}) {
     clock = () => new Date(),
     budgets = {},
     log = console.log,
+    debug = false,
     summaryFile,
   } = options;
   const started = clock();
@@ -73,7 +75,7 @@ export async function runPipeline(options = {}) {
   const rate = resolveMonthlyRate(settings.inflation);
 
   const ctx = createStoreFetchContext(registry, { ...http, robots: state.robots, log: (message) => log(`[cuotear] http: ${message}`) });
-  const { measurements, reports } = await measureProducts({ config, registry, ctx, codigoPostal: settings.codigoPostal, budgets, log, ...(http.now === undefined ? {} : { now: http.now }) });
+  const { measurements, reports } = await measureProducts({ config, registry, ctx, codigoPostal: settings.codigoPostal, budgets, log, debug, ...(http.now === undefined ? {} : { now: http.now }) });
   for (const report of reports) {
     const failed = Object.values(report.failures).reduce((sum, count) => sum + count, 0);
     if (failed > 0) log(`::warning::cuotear: ${report.store}: ${failed} of ${report.urls} URL(s) failed (${Object.keys(report.failures).join(', ')}); the last valid price is kept`);
