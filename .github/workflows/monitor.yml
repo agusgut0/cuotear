@@ -3,7 +3,14 @@ name: Monitor
 # Measures the prices every 6 hours, records the history, builds the static
 # site and publishes it to GitHub Pages (DRT 10.1, ADR-0005). The run is also
 # available on demand; with `dry_run` it measures and builds but writes no
-# history, saves no state, makes no commit and does not deploy.
+# history, saves no state, makes no commit, sends no alert, touches no issue
+# and does not deploy.
+#
+# Single measuring job on purpose (DRT 10.1): one checkout, one state, one
+# commit. The Telegram secrets exist only in the env of the notify step, which
+# runs after the measuring step; the history commit gets only GITHUB_TOKEN.
+# Only schedule and workflow_dispatch trigger this workflow, so only trusted
+# refs write the `cuotear-state-*` cache.
 
 on:
   schedule:
@@ -27,7 +34,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
-      contents: write # push of the data/history commit (issues: write arrives with the ops notices)
+      contents: write # push of the data/history commit
+      issues: write # the cuotear-ops issues opened and closed by notify.js
+      actions: read # run history used to compute the availability (RNF-10)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -62,6 +71,20 @@ jobs:
           GIT_COMMITTER_NAME: github-actions[bot]
           GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
         run: node src/cli/commit.js
+      - name: Send the alerts and reconcile the ops issues
+        # Also runs when the measure step failed (it reports config-ausente). Skipped on a dry run:
+        # a dry run sends no alert and touches no issue (DRT 10.1), so it never needs the secrets.
+        # notify.js always exits 0; continue-on-error is a second guard so it can never fail the run.
+        # Only the default branch may send alerts and touch issues (same guard as the history commit).
+        if: ${{ !cancelled() && !inputs.dry_run && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CUOTEAR_SITE_URL: ${{ vars.CUOTEAR_SITE_URL }}
+          CUOTEAR_CRON_START: ${{ vars.CUOTEAR_CRON_START }}
+        run: node src/cli/notify.js
       - name: Save the run state
         if: ${{ always() && !inputs.dry_run }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
