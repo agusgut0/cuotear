@@ -70,7 +70,7 @@ export async function commitHistory({ git, branch, now = new Date(), sleep = (ms
   await mustRun(git, ['add', '--', HISTORY_PATHSPEC]);
   const purgeOnly = addedLines(await mustRun(git, ['diff', '--cached', '--numstat', '--', HISTORY_PATHSPEC])) === 0;
   const message = `chore(data): ${purgeOnly ? 'purge price history' : 'record price changes'} (${stamp(now)})`;
-  await mustRun(git, ['-c', `user.name=${BOT_NAME}`, '-c', `user.email=${BOT_EMAIL}`, 'commit', '-m', message]);
+  await mustRun(git, ['-c', `user.name=${BOT_NAME}`, '-c', `user.email=${BOT_EMAIL}`, 'commit', '-m', message, '--', HISTORY_PATHSPEC]);
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     const pushed = await git(['push', 'origin', `HEAD:${branch}`]);

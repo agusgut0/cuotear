@@ -50,14 +50,16 @@ describe('commitHistory', () => {
     assert.deepEqual(verbs(), ['status', 'add', 'diff', 'commit', 'push']);
     const commit = calls[3] ?? [];
     assert.ok(commit.includes('user.name=github-actions[bot]'));
-    assert.equal(commit.at(-1), 'chore(data): record price changes (2026-11-22 12:17 UTC)');
+    assert.equal(commit[commit.indexOf('-m') + 1], 'chore(data): record price changes (2026-11-22 12:17 UTC)');
+    assert.deepEqual(commit.slice(-2), ['--', 'data/history'], 'the commit is limited to data/history');
     assert.deepEqual(calls[4], ['push', 'origin', 'HEAD:main']);
   });
 
   test('a purge (only deletions) gets the purge message', async () => {
     const { git, calls } = fakeGit({ status: [{ stdout: ' M data/history/tv.jsonl\n' }], diff: [{ stdout: '0\t3\tdata/history/tv.jsonl\n' }] });
     await commitHistory({ git, branch: 'main', now: NOW, log: () => {} });
-    assert.equal(calls[3]?.at(-1), 'chore(data): purge price history (2026-11-22 12:17 UTC)');
+    const purge = calls[3] ?? [];
+    assert.equal(purge[purge.indexOf('-m') + 1], 'chore(data): purge price history (2026-11-22 12:17 UTC)');
   });
 
   test('a rejected push is retried after fetch and rebase', async () => {

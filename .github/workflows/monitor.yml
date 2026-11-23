@@ -55,7 +55,8 @@ jobs:
             node src/cli/run.js
           fi
       - name: Commit the history
-        if: ${{ !cancelled() && steps.measure.outcome == 'success' && !inputs.dry_run }}
+        # Only the default branch may push history (a dispatch from another branch must not write).
+        if: ${{ !cancelled() && steps.measure.outcome == 'success' && !inputs.dry_run && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GIT_COMMITTER_NAME: github-actions[bot]
