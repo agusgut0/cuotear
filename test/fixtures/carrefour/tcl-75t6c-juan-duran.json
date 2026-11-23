@@ -1,0 +1,292 @@
+[
+  {
+    "productId": "1779459",
+    "productName": "Smart TV TCL 75 75T6C QLED UHD Google TV",
+    "linkText": "smart-tv-tcl-75-75t6c-qled-uhd-google-tv-1779459",
+    "items": [
+      {
+        "itemId": "328989",
+        "name": "Smart TV TCL 75 75T6C QLED UHD Google TV",
+        "sellers": [
+          {
+            "sellerId": "Producteca251428",
+            "sellerName": "Juan Duran Trendy Deals",
+            "sellerDefault": true,
+            "commertialOffer": {
+              "Price": 2701499,
+              "ListPrice": 3601998.66,
+              "AvailableQuantity": 100,
+              "IsAvailable": true,
+              "Installments": [
+                {
+                  "PaymentSystemName": "American Express",
+                  "NumberOfInstallments": 1,
+                  "Value": 2701499,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "American Express",
+                  "NumberOfInstallments": 2,
+                  "Value": 1782989.34,
+                  "TotalValuePlusInterestRate": 3565978.68,
+                  "InterestRate": 16
+                },
+                {
+                  "PaymentSystemName": "American Express",
+                  "NumberOfInstallments": 3,
+                  "Value": 1502123.49,
+                  "TotalValuePlusInterestRate": 4506370.47,
+                  "InterestRate": 22.27
+                },
+                {
+                  "PaymentSystemName": "American Express",
+                  "NumberOfInstallments": 12,
+                  "Value": 225124.91,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Visa",
+                  "NumberOfInstallments": 1,
+                  "Value": 2701499,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Visa",
+                  "NumberOfInstallments": 2,
+                  "Value": 1409912.32,
+                  "TotalValuePlusInterestRate": 2819824.64,
+                  "InterestRate": 2.19
+                },
+                {
+                  "PaymentSystemName": "Visa",
+                  "NumberOfInstallments": 3,
+                  "Value": 1004507.37,
+                  "TotalValuePlusInterestRate": 3013522.11,
+                  "InterestRate": 3.85
+                },
+                {
+                  "PaymentSystemName": "Visa",
+                  "NumberOfInstallments": 6,
+                  "Value": 693654.89,
+                  "TotalValuePlusInterestRate": 4161929.34,
+                  "InterestRate": 9.01
+                },
+                {
+                  "PaymentSystemName": "Visa",
+                  "NumberOfInstallments": 9,
+                  "Value": 688912.26,
+                  "TotalValuePlusInterestRate": 6200210.34,
+                  "InterestRate": 14.39
+                },
+                {
+                  "PaymentSystemName": "Visa",
+                  "NumberOfInstallments": 12,
+                  "Value": 225124.91,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Mastercard",
+                  "NumberOfInstallments": 1,
+                  "Value": 2701499,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Mastercard",
+                  "NumberOfInstallments": 2,
+                  "Value": 1409912.32,
+                  "TotalValuePlusInterestRate": 2819824.64,
+                  "InterestRate": 2.19
+                },
+                {
+                  "PaymentSystemName": "Mastercard",
+                  "NumberOfInstallments": 3,
+                  "Value": 1004507.37,
+                  "TotalValuePlusInterestRate": 3013522.11,
+                  "InterestRate": 3.85
+                },
+                {
+                  "PaymentSystemName": "Mastercard",
+                  "NumberOfInstallments": 6,
+                  "Value": 693654.89,
+                  "TotalValuePlusInterestRate": 4161929.34,
+                  "InterestRate": 9.01
+                },
+                {
+                  "PaymentSystemName": "Mastercard",
+                  "NumberOfInstallments": 9,
+                  "Value": 688912.26,
+                  "TotalValuePlusInterestRate": 6200210.34,
+                  "InterestRate": 14.39
+                },
+                {
+                  "PaymentSystemName": "Mastercard",
+                  "NumberOfInstallments": 12,
+                  "Value": 225124.91,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Visa Electron",
+                  "NumberOfInstallments": 1,
+                  "Value": 2701499,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Vale",
+                  "NumberOfInstallments": 1,
+                  "Value": 2701499,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Cabal",
+                  "NumberOfInstallments": 1,
+                  "Value": 2701499,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Cabal",
+                  "NumberOfInstallments": 2,
+                  "Value": 1540664.87,
+                  "TotalValuePlusInterestRate": 3081329.74,
+                  "InterestRate": 7.03
+                },
+                {
+                  "PaymentSystemName": "Cabal",
+                  "NumberOfInstallments": 3,
+                  "Value": 1156061.47,
+                  "TotalValuePlusInterestRate": 3468184.41,
+                  "InterestRate": 9.46
+                },
+                {
+                  "PaymentSystemName": "Cabal",
+                  "NumberOfInstallments": 6,
+                  "Value": 912746.46,
+                  "TotalValuePlusInterestRate": 5476478.76,
+                  "InterestRate": 17.12
+                },
+                {
+                  "PaymentSystemName": "Cabal",
+                  "NumberOfInstallments": 12,
+                  "Value": 225124.91,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Naranja",
+                  "NumberOfInstallments": 1,
+                  "Value": 2701499,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Maestro",
+                  "NumberOfInstallments": 1,
+                  "Value": 2701499,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "MercadoPagoPro",
+                  "NumberOfInstallments": 1,
+                  "Value": 2701499,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Efectivo",
+                  "NumberOfInstallments": 1,
+                  "Value": 2701499,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Tarjeta Mi Carrefour Credito Headless",
+                  "NumberOfInstallments": 1,
+                  "Value": 2701499,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Cuenta Digital Carrefour Headless",
+                  "NumberOfInstallments": 1,
+                  "Value": 2701499,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "MercadoPago Headless",
+                  "NumberOfInstallments": 1,
+                  "Value": 2701499,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Tarjeta Carrefour Mastercard",
+                  "NumberOfInstallments": 1,
+                  "Value": 2701499,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Tarjeta Carrefour Mastercard",
+                  "NumberOfInstallments": 2,
+                  "Value": 1658450.23,
+                  "TotalValuePlusInterestRate": 3316900.46,
+                  "InterestRate": 11.39
+                },
+                {
+                  "PaymentSystemName": "Tarjeta Carrefour Mastercard",
+                  "NumberOfInstallments": 3,
+                  "Value": 1331658.9,
+                  "TotalValuePlusInterestRate": 3994976.7,
+                  "InterestRate": 15.96
+                },
+                {
+                  "PaymentSystemName": "Tarjeta Carrefour Mastercard",
+                  "NumberOfInstallments": 6,
+                  "Value": 1280690.62,
+                  "TotalValuePlusInterestRate": 7684143.72,
+                  "InterestRate": 30.74
+                },
+                {
+                  "PaymentSystemName": "Tarjeta Carrefour Mastercard",
+                  "NumberOfInstallments": 12,
+                  "Value": 225124.91,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                },
+                {
+                  "PaymentSystemName": "Prepaga BSF",
+                  "NumberOfInstallments": 1,
+                  "Value": 2701499,
+                  "TotalValuePlusInterestRate": 2701499,
+                  "InterestRate": 0
+                }
+              ]
+            }
+          },
+          {
+            "sellerId": "1",
+            "sellerName": "CARREFOUR",
+            "sellerDefault": false,
+            "commertialOffer": {
+              "Price": 0,
+              "ListPrice": 0,
+              "AvailableQuantity": 0,
+              "IsAvailable": false,
+              "Installments": []
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

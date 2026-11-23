@@ -1,6 +1,7 @@
 import { checkVtexProductUrl } from './url.js';
+import { megatone } from './megatone/index.js';
 import { createVtexStore } from './vtex/adapter.js';
-import { oncity } from './vtex/profiles.js';
+import { carrefour, naldo, oncity } from './vtex/profiles.js';
 
 /**
  * Registration of a store adapter (DRT 6.1).
@@ -18,4 +19,4 @@ import { oncity } from './vtex/profiles.js';
  * Single place to touch when adding a store (DRT section 3).
  * @type {readonly StoreRegistration[]}
  */
-export const stores = [createVtexStore(oncity, checkVtexProductUrl)];
+export const stores = [...[oncity, carrefour, naldo].map((profile) => createVtexStore(profile, checkVtexProductUrl)), megatone];

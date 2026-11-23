@@ -1,9 +1,9 @@
 /**
  * VTEX store profiles: data, not code (DRT 6.2).
  *
- * `simulacion` enables the optional checkout simulation. On City's robots.txt
- * disallows the checkout routes, so its profile must keep it off; the
- * simulation itself arrives with the Carrefour and Naldo profiles (DRT F3).
+ * `simulacion` enables the optional checkout simulation. It is NOT implemented
+ * (the spike showed it adds no cash discount over the catalog, DRT 6.2), so every
+ * profile keeps it off; On City's robots.txt also disallows the checkout routes.
  *
  * @typedef {Object} VtexProfile
  * @property {string} id
@@ -20,4 +20,22 @@ export const oncity = Object.freeze({
   hosts: ['www.oncity.com'],
   simulacion: false,
   status: 'vigente',
+});
+
+/** @type {VtexProfile} */
+export const carrefour = Object.freeze({
+  id: 'carrefour',
+  displayName: 'Carrefour',
+  hosts: ['www.carrefour.com.ar'],
+  simulacion: false,
+  status: 'vigente',
+});
+
+/** @type {VtexProfile} */
+export const naldo = Object.freeze({
+  id: 'naldo',
+  displayName: 'Naldo',
+  hosts: ['www.naldo.com.ar'],
+  simulacion: false,
+  status: 'provisional',
 });

@@ -1,0 +1,22 @@
+{
+  "outcome": "ok",
+  "listaCents": 270149900,
+  "contado": {
+    "valorCents": 270149900,
+    "medio": "efectivo",
+    "descuentoPct": 0
+  },
+  "tarjetas": {
+    "visa": {
+      "n": 12,
+      "cuotaCents": 22512491,
+      "totalCents": 270149900
+    },
+    "mastercard": {
+      "n": 12,
+      "cuotaCents": 22512491,
+      "totalCents": 270149900
+    },
+    "naranja": null
+  }
+}
