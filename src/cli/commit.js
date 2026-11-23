@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { commitHistory } from '../git/commit-history.js';
+import { loadState, saveState } from '../state/store.js';
 
 /**
  * `node src/cli/commit.js`: commits and pushes `data/history/` when it changed.
@@ -29,7 +30,10 @@ const git = (args) =>
   });
 
 try {
-  await commitHistory({ git, branch: process.env.GITHUB_REF_NAME ?? 'main' });
+  const outcome = await commitHistory({ git, branch: process.env.GITHUB_REF_NAME ?? 'main' });
+  // Tells the notify step (cause `commit-conflicto`, DRT 11 step 11) through the run state.
+  const loaded = loadState();
+  if (!loaded.rebuilt) saveState({ ...loaded.state, ops: { ...loaded.state.ops, commitConflict: outcome.status === 'unpushed' } });
 } catch (error) {
   console.error(`::error::cuotear: unexpected git error: ${error instanceof Error ? error.message : String(error)}`);
   process.exitCode = 1;

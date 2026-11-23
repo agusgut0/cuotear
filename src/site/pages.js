@@ -49,7 +49,10 @@ ${body}
 <footer class="site-footer">
 <p>${lastValid === undefined ? t('footer.no_measurement') : t('footer.fresh', { date: fmt.dateTime(lastValid) })}</p>
 <p>${failing === '' ? t('footer.stores_ok') : t('footer.stores_failing', { stores: failing })}</p>
+<p>${t('footer.last_run', { date: fmt.dateTime(model.builtAt) })}</p>
 <p>${rate}</p>
+${model.availability === null || model.availability === undefined ? '' : html`<p>${t('footer.availability', { value: fmt.percent(model.availability) })}</p>`}
+<p>${model.openNotices === undefined || model.openNotices === 0 ? t('footer.notices_none') : t('footer.notices_open', { count: model.openNotices })}</p>
 <p>${t('footer.disclaimer')}</p>
 </footer>
 </body>

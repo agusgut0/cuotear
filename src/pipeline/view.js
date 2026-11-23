@@ -1,6 +1,7 @@
 import { compareProduct } from '../core/compare.js';
 import { lastOkPoint } from '../core/history.js';
-import { cardOfSerie, CONTADO, cardSerie } from '../core/series.js';
+import { bestOption } from '../core/rules.js';
+import { cardOfSerie, CONTADO } from '../core/series.js';
 
 /**
  * What the site and the run state need about one product after a run: the
@@ -64,14 +65,14 @@ export function buildView({ product, records, points, r, s, marginalPct }) {
 }
 
 /**
- * The best option in the shape the run state keeps (`prevBest`).
- * @param {import('../core/compare.js').ProductComparison} comparison
- * @param {number|null} r
+ * The real best option in the shape the run state keeps (`prevBest`), with
+ * the definition the alert rules use (`bestOption` of `core/rules.js`), so
+ * what is saved is what the next run compares against. A cash-only product, or
+ * one without card plans, still has a best option. Null without a rate.
+ * @param {{ stores: readonly import('../core/compare.js').StoreInput[], r: number|null, s: 0|1, hold?: { tipo: string, tienda: string, serie: string }|null }} input
  * @returns {import('../state/schema.js').RunState['prevBest'][string] | null}
  */
-export function bestForState(comparison, r) {
-  const { best } = comparison;
-  if (best === null) return null;
-  if (best.tipo === 'contado') return { tipo: 'contado', tienda: best.store, serie: CONTADO, valorCents: comparison.pcStarCents ?? 0, r };
-  return { tipo: 'cuotas', tienda: best.store, serie: cardSerie(best.card, best.n), valorCents: Math.round(comparison.vpStarCents ?? 0), r };
+export function bestForState({ stores, r, s, hold = null }) {
+  const best = bestOption({ stores, r, s, hold });
+  return best === null ? null : { tipo: best.tipo, tienda: best.tienda, serie: best.serie, valorCents: best.valueCents, r };
 }

@@ -162,6 +162,8 @@ function seriesAlerts({ productId, prevPoints, added, t, verificarBajaPct = DEFA
         currentCents: current,
         verifyPct: verificarBajaPct,
         ...(satisfied.includes('precio_objetivo') && rules.objetivoCents !== null ? { objetivoCents: rules.objetivoCents } : {}),
+        ...(point.serie === CONTADO && point.medio !== undefined ? { medio: point.medio } : {}),
+        ...(point.serie === CONTADO && point.desc !== undefined ? { desc: point.desc } : {}),
         detectedAt: t,
       }),
     );
@@ -372,4 +374,17 @@ export function evaluateProduct(input) {
   const rules = resolveRules(input.globalRules, input.productRules);
   const series = seriesAlerts(input, rules).sort((a, b) => (a.kind === 'serie' && b.kind === 'serie' ? text(a.tienda, b.tienda) || text(a.serie, b.serie) : 0));
   return [...series, ...mejorVpAlerts(input, rules), ...bestChangeAlerts(input, rules)];
+}
+
+/**
+ * The real best option of a product in the definition the rules use
+ * (`cambio_mejor_opcion`, DRT 13.2): the run state keeps it as `prevBest`, so
+ * both sides agree. A cash-only product, or one without card plans, still has
+ * a best option; without a rate only cash can be valued, so the result is
+ * null when there is no rate (the rules stay silent then).
+ * @param {{ stores: readonly import('./compare.js').StoreInput[], r: number|null, s: 0|1, hold?: { tipo: string, tienda: string, serie: string }|null }} input
+ * @returns {{ tipo: 'contado'|'cuotas', tienda: string, serie: string, valueCents: number }|null}
+ */
+export function bestOption({ stores, r, s, hold = null }) {
+  return r === null ? null : bestOf(stores, r, s, hold);
 }

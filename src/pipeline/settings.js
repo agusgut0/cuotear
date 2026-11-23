@@ -7,6 +7,7 @@
  * @property {number} staleHours
  * @property {number} retentionMonths
  * @property {number} marginalPct
+ * @property {number} verifyDropPct `verificar_baja_pct` (RN-13)
  * @property {string} codigoPostal
  * @property {0|1} s month of the first installment
  * @property {{ fuente: 'rem'|'manual', manual?: import('../config/types.js').ManualInflation }} inflation
@@ -29,6 +30,7 @@ export function settingsOf(config) {
     staleHours: number('desactualizado_horas', 12),
     retentionMonths: number('retencion_meses', 12),
     marginalPct: number('marginal_pct', 1),
+    verifyDropPct: number('verificar_baja_pct', 90),
     codigoPostal: typeof postalCode === 'string' ? postalCode : '5000',
     s: config.comparacion?.s ?? 1,
     inflation: config.comparacion?.inflacion ?? { fuente: 'rem' },

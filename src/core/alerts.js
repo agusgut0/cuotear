@@ -27,6 +27,8 @@ import { createHash } from 'node:crypto';
  * @property {number} dropPct dropCents * 100 / prevCents
  * @property {boolean} verify RN-13: the drop exceeds `verificar_baja_pct`, "a verificar"
  * @property {number} [objetivoCents] present when `precio_objetivo` fired
+ * @property {string} [medio] cash condition of the current point (`transferencia`, `debito`...); only for the cash series, only to render the alert
+ * @property {number|null} [desc] cash discount of the current point, percent
  * @property {string} detectedAt run timestamp (used to discard stale pending alerts)
  *
  * @typedef {Object} BestChangeAlert one per product
@@ -80,11 +82,11 @@ export function alertId({ productId, serie, prevT, prevCents, currentCents, rule
  * @param {{
  *   productId: string, tienda: string, serie: string, rules: readonly RuleName[],
  *   prevT: string, prevCents: number, currentCents: number, verifyPct: number,
- *   objetivoCents?: number, detectedAt: string,
+ *   objetivoCents?: number, medio?: string, desc?: number|null, detectedAt: string,
  * }} input
  * @returns {SeriesAlert}
  */
-export function buildSeriesAlert({ productId, tienda, serie, rules, prevT, prevCents, currentCents, verifyPct, objetivoCents, detectedAt }) {
+export function buildSeriesAlert({ productId, tienda, serie, rules, prevT, prevCents, currentCents, verifyPct, objetivoCents, medio, desc, detectedAt }) {
   const ordered = sortRules(rules);
   const dropCents = prevCents - currentCents;
   const dropPct = (dropCents * 100) / prevCents;
@@ -102,6 +104,8 @@ export function buildSeriesAlert({ productId, tienda, serie, rules, prevT, prevC
     dropPct,
     verify: dropPct > verifyPct,
     ...(objetivoCents === undefined ? {} : { objetivoCents }),
+    ...(medio === undefined ? {} : { medio }),
+    ...(desc === undefined ? {} : { desc }),
     detectedAt,
   };
 }

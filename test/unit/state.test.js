@@ -121,3 +121,40 @@ describe('run state (DRT 9, ADR-0004)', () => {
     assert.deepEqual(loadState('does/not/exist.json').state.series, {});
   });
 });
+
+describe('run state: fields added in F4 (compatible extension of version 1)', () => {
+  const hash = `sha256:${'b'.repeat(64)}`;
+
+  test('products and the new ops fields round-trip', () => {
+    withStateFile((path) => {
+      const state = {
+        ...fullState(),
+        products: { 'tcl-75t6c': { configHash: hash, s: 1, r: 0.025 }, 'sin-tasa': { configHash: hash, s: 0, r: null } },
+        ops: { lastCauses: ['inactividad'], measuredStores: ['oncity'], commitConflict: false, channelBroken: true, availability: { value: 97.5, at: '2026-11-22T12:17:41Z' } },
+      };
+      saveState(/** @type {any} */ (state), path);
+      assert.deepEqual(loadState(path).state, state);
+    });
+  });
+
+  test('a state written before F4 (no products, plain ops) still loads, and the product memory is simply absent', () => {
+    withStateFile((path) => {
+      saveState(fullState(), path);
+      const loaded = loadState(path);
+      assert.equal(loaded.rebuilt, false);
+      assert.equal(loaded.state.products, undefined);
+      assert.equal(loaded.state.eligible['tcl-75t6c']?.length, 2, 'the rest of the state is kept');
+    });
+  });
+
+  test('invalid values are refused (a hand-edited or corrupt cache is a loss, never trusted)', () => {
+    const valid = { ...fullState(), products: { a: { configHash: hash, s: 1, r: 0.01 } } };
+    assert.equal(isRunState(valid), true);
+    assert.equal(isRunState({ ...valid, products: { a: { configHash: 'x', s: 1, r: 0.01 } } }), false);
+    assert.equal(isRunState({ ...valid, products: { a: { configHash: hash, s: 2, r: 0.01 } } }), false);
+    assert.equal(isRunState({ ...valid, products: { a: { configHash: hash, s: 1, r: -1 } } }), false);
+    assert.equal(isRunState({ ...valid, products: { a: { configHash: hash, s: 1 } } }), false);
+    assert.equal(isRunState({ ...valid, ops: { lastCauses: [], availability: { value: 101, at: '2026-11-22T12:17:41Z' } } }), false);
+    assert.equal(isRunState({ ...valid, ops: { lastCauses: [], extra: 1 } }), false);
+  });
+});

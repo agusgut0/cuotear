@@ -17,7 +17,20 @@ import Ajv2020 from 'ajv/dist/2020.js';
  * @property {Record<string, import('../http/client.js').RobotsEntry>} robots
  * @property {Record<string, unknown>[]} pendingAlerts
  * @property {{ id: string, at: string }[]} sentAlertIds
- * @property {{ lastCauses: string[] }} ops
+ * @property {Record<string, ProductState>} [products] per product, what the rules need from the previous run; absent in states written before F4, which the rules treat as lost (no best-option alerts)
+ * @property {OpsState} ops
+ *
+ * @typedef {Object} ProductState
+ * @property {string} configHash `sha256:<hex>` of the product's configuration
+ * @property {0|1} s first-installment month used in the run
+ * @property {number|null} r monthly rate used in the run
+ *
+ * @typedef {Object} OpsState
+ * @property {string[]} lastCauses operational causes of the last run (DRT 13.6)
+ * @property {string[]} [measuredStores] stores with at least one measured URL in the last run
+ * @property {boolean} [commitConflict] the history commit of the last run could not be pushed (set by `commit.js`)
+ * @property {boolean} [channelBroken] Telegram answered 401 and no message was accepted since
+ * @property {{ value: number | null, at: string }} [availability] last known availability of the scheduled runs, in percent
  */
 
 export const STATE_SCHEMA_VERSION = 1;
@@ -92,7 +105,36 @@ export const stateSchema = {
       type: 'array',
       items: { type: 'object', additionalProperties: false, required: ['id', 'at'], properties: { id: { type: 'string' }, at: timestamp } },
     },
-    ops: { type: 'object', additionalProperties: false, required: ['lastCauses'], properties: { lastCauses: { type: 'array', items: { type: 'string' } } } },
+    products: {
+      type: 'object',
+      additionalProperties: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['configHash', 's', 'r'],
+        properties: {
+          configHash: { type: 'string', pattern: '^sha256:[0-9a-f]{64}$' },
+          s: { enum: [0, 1] },
+          r: { anyOf: [{ type: 'number', minimum: 0 }, { type: 'null' }] },
+        },
+      },
+    },
+    ops: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['lastCauses'],
+      properties: {
+        lastCauses: { type: 'array', items: { type: 'string' } },
+        measuredStores: { type: 'array', items: { type: 'string' } },
+        commitConflict: { type: 'boolean' },
+        channelBroken: { type: 'boolean' },
+        availability: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['value', 'at'],
+          properties: { value: { anyOf: [{ type: 'number', minimum: 0, maximum: 100 }, { type: 'null' }] }, at: timestamp },
+        },
+      },
+    },
   },
 };
 
