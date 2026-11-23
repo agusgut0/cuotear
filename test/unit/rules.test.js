@@ -579,3 +579,41 @@ describe('precio_objetivo con aplica_a mejor_vp (RF-22)', () => {
     assert.ok(crossing({}).every((alert) => alert.kind === 'mejor_vp'));
   });
 });
+
+describe('baja_minima_monto with decimals (RF-22)', () => {
+  // 1234.565 pesos is 123456.5 centavos: half a centavo rounds up to 123457 (resolveRules, toCents).
+  const globalRules = { baja_minima_monto: 1234.565 };
+
+  test('the threshold in centavos is the rounded half-up value', () => {
+    assert.equal(resolveRules(globalRules, undefined).bajaMontoCents, 123_457);
+  });
+
+  test('a drop of exactly the threshold (1234,57) alerts, inclusive', () => {
+    const [alert] = cashMove(1_000_000, 1_000_000 - 123_457, { globalRules });
+    assert.ok(alert?.kind === 'serie');
+    assert.deepEqual(alert.rules, ['baja_minima_monto']);
+    assert.equal(alert.dropCents, 123_457);
+  });
+
+  test('one centavo short (1234,56) does not alert', () => {
+    assert.deepEqual(cashMove(1_000_000, 1_000_000 - 123_456, { globalRules }), []);
+  });
+});
+
+describe('a series closed and reopened (RN-12, pins the current documented behavior)', () => {
+  test('the comparison is against the last ok point before the closing, not against nothing', () => {
+    const closed = { t: '2026-11-21T00:00:00Z', tienda: 'oncity', serie: 'contado', estado: /** @type {const} */ ('cerrada') };
+    const prevPoints = [cash('2026-11-20T00:00:00Z', 'oncity', $(1_000_000)), closed];
+    const [alert] = run({ prevPoints, added: [cash(T1, 'oncity', $(900_000))], eligible: ['oncity/contado'] });
+    assert.ok(alert?.kind === 'serie');
+    assert.equal(alert.prevCents, $(1_000_000));
+    assert.equal(alert.prevT, '2026-11-20T00:00:00Z');
+    assert.equal(alert.currentCents, $(900_000));
+  });
+
+  test('a reopened series priced above the old one does not alert', () => {
+    const closed = { t: '2026-11-21T00:00:00Z', tienda: 'oncity', serie: 'contado', estado: /** @type {const} */ ('cerrada') };
+    const prevPoints = [cash('2026-11-20T00:00:00Z', 'oncity', $(1_000_000)), closed];
+    assert.deepEqual(run({ prevPoints, added: [cash(T1, 'oncity', $(1_100_000))], eligible: ['oncity/contado'] }), []);
+  });
+});

@@ -291,3 +291,17 @@ describe('reconcileOpsIssues', () => {
     assert.ok(!second.lines.join('\n').includes(TOKEN));
   });
 });
+
+describe('S5: the GitHub API client does not follow redirects (the token is in a header)', () => {
+  test('every request is sent with redirect: error', async () => {
+    const seen = /** @type {(RequestInit | undefined)[]} */ ([]);
+    /** @type {typeof fetch} */
+    const spy = async (_input, init) => {
+      seen.push(init);
+      return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+    await reconcileOpsIssues({ causes: [], repo: 'owner/cuotear', token: 'ghs_faketoken', fetch: spy, log: () => {} });
+    assert.ok(seen.length > 0);
+    assert.ok(seen.every((init) => init?.redirect === 'error'));
+  });
+});

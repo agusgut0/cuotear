@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { formatIssue, validateConfig, validateConfigFile } from '../../src/config/validate.js';
+import { validateSemantics } from '../../src/config/semantic.js';
 import { checkVtexProductUrl } from '../../src/stores/url.js';
 
 // Literal on purpose: losing a store from the registry must break these tests.
@@ -266,5 +267,25 @@ describe('RF-19: no secrets in the configuration', () => {
     const token = '123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw_x';
     assertFails(configWith(1).replace('Producto 1', token), /parece un secreto/);
     assertFails(configWith(1).replace('Producto 1', 'dueño@example.com'), /parece un secreto/);
+  });
+});
+
+describe('S4: product ids that collide with Object.prototype are refused', () => {
+  test('"constructor" passes the id pattern but is refused with a clear message', () => {
+    assertFails(configWith(1).replace('id: producto-1', 'id: constructor'), /id de producto reservado "constructor"/);
+  });
+
+  test('every property of Object.prototype is refused by the semantic check, whatever the pattern says', () => {
+    const names = ['constructor', 'toString', 'valueOf', '__proto__', 'hasOwnProperty', 'isPrototypeOf', 'propertyIsEnumerable', 'toLocaleString'];
+    for (const id of names) {
+      const config = /** @type {import('../../src/config/types.js').Config} */ ({ version: 1, productos: [{ id, nombre: 'x', urls: { oncity: 'https://www.oncity.com/producto-1/p' } }] });
+      const { errors } = validateSemantics(config, [fakeStore('oncity')]);
+      assert.ok(errors.some((error) => error.message.includes(`id de producto reservado "${id}"`)), `id ${id}`);
+    }
+  });
+
+  test('ordinary ids, even close to those names, are accepted', () => {
+    assert.equal(validateConfig(configWith(1).replace('id: producto-1', 'id: constructor-2')).ok, true);
+    assert.equal(validateConfig(configWith(1).replace('id: producto-1', 'id: tostring')).ok, true);
   });
 });

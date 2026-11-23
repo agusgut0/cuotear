@@ -38,6 +38,11 @@ export const MAX_MESSAGE_CHARS = 3800;
 export const MIN_INTERVAL_MS = 1100;
 export const MAX_RETRY_AFTER_S = 30;
 export const REQUEST_TIMEOUT_MS = 15_000;
+/** Messages sent in one run at most; the rest of the alerts stay pending (a flood cannot hold the run). */
+export const MAX_MESSAGES_PER_RUN = 10;
+/** An alert id is a sha256 hex digest; the pattern is wider only to stay safe to log and to store. */
+export const ALERT_ID_PATTERN = /^[A-Za-z0-9:_-]{1,100}$/;
+const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
 const MAX_NAME_CHARS = 120;
 const TOKEN_PATTERN = /^\d{3,20}:[A-Za-z0-9_-]{20,100}$/;
 const CHAT_PATTERN = /^(-?\d{1,20}|@[A-Za-z0-9_]{5,32})$/;
@@ -151,7 +156,7 @@ const isText = (/** @type {unknown} */ value, max = 200) => typeof value === 'st
 export function isAlert(value) {
   if (typeof value !== 'object' || value === null) return false;
   const alert = /** @type {Record<string, unknown>} */ (value);
-  if (!isText(alert.id, 100) || !isText(alert.detectedAt, 40) || !isText(alert.productId, 40) || !PRODUCT_ID.test(String(alert.productId))) return false;
+  if (typeof alert.id !== 'string' || !ALERT_ID_PATTERN.test(alert.id) || typeof alert.detectedAt !== 'string' || !TIMESTAMP.test(alert.detectedAt) || Number.isNaN(Date.parse(alert.detectedAt)) || !isText(alert.productId, 40) || !PRODUCT_ID.test(String(alert.productId))) return false;
   if (!Array.isArray(alert.rules) || alert.rules.length === 0 || !alert.rules.every((rule) => typeof rule === 'string' && /^[a-z_]{3,30}$/.test(rule))) return false;
   if (alert.kind === 'serie') return isText(alert.tienda, 40) && isText(alert.serie, 40) && isCents(alert.prevCents) && isCents(alert.currentCents) && typeof alert.dropPct === 'number' && typeof alert.verify === 'boolean';
   if (alert.kind === 'cambio_mejor_opcion') {
@@ -257,6 +262,8 @@ function createSender({ secrets, fetch: fetchFn, sleep, now, log }) {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ chat_id: secrets.chatId, text, parse_mode: 'HTML', link_preview_options: { is_disabled: true } }),
+        // The bot token is in the URL path: a redirect must never carry it somewhere else.
+        redirect: 'error',
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
       /** @type {unknown} */
@@ -316,10 +323,12 @@ function createSender({ secrets, fetch: fetchFn, sleep, now, log }) {
  *   sleep?: (ms: number) => Promise<void>,
  *   now?: () => number,
  *   log?: (line: string) => void,
+ *   maxMessages?: number,
+ *   onSent?: (ids: readonly string[]) => void,
  * }} input
- * @returns {Promise<SendResult>}
+ * @returns {Promise<SendResult>} `onSent` is called right after each accepted message, so a caller never loses what went out
  */
-export async function sendAlerts({ alerts, secrets, context, fetch: fetchFn = fetch, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = () => Date.now(), log = console.log }) {
+export async function sendAlerts({ alerts, secrets, context, fetch: fetchFn = fetch, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = () => Date.now(), log = console.log, maxMessages = MAX_MESSAGES_PER_RUN, onSent }) {
   /** @type {SendResult} */
   const result = { sent: [], pending: [], unauthorized: false };
   /** @type {{ id: string, block: string }[]} */
@@ -340,6 +349,10 @@ export async function sendAlerts({ alerts, secrets, context, fetch: fetchFn = fe
   for (const [index, group] of groups.entries()) {
     const ids = entries.slice(offset, offset + group.length).map((entry) => entry.id);
     offset += group.length;
+    if (!stopped && index >= maxMessages) {
+      log(`[cuotear] telegram: the limit of ${maxMessages} message(s) per run was reached; the remaining alerts stay pending`);
+      stopped = true;
+    }
     if (stopped) {
       result.pending.push(...ids);
       continue;
@@ -347,6 +360,7 @@ export async function sendAlerts({ alerts, secrets, context, fetch: fetchFn = fe
     const status = await send(group.join('\n\n'));
     if (status === 'ok') {
       result.sent.push(...ids);
+      onSent?.(ids);
       log(`[cuotear] telegram: message ${index + 1}/${groups.length} sent (${ids.length} alert(s))`);
       continue;
     }

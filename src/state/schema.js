@@ -1,4 +1,5 @@
 import Ajv2020 from 'ajv/dist/2020.js';
+import { CAUSE_PATTERN_SOURCE, STORE_ID_SOURCE } from '../notify/ops-issues.js';
 
 /**
  * Run-state schema (DRT 9, ADR-0004). The state lives outside the commits
@@ -34,6 +35,10 @@ import Ajv2020 from 'ajv/dist/2020.js';
  */
 
 export const STATE_SCHEMA_VERSION = 1;
+/** Upper bounds that keep a tampered or runaway cache small (S3). */
+export const MAX_PENDING_ALERTS = 200;
+export const MAX_SENT_ALERT_IDS = 2000;
+const MAX_CAUSES = 50;
 
 const timestamp = { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$' };
 
@@ -100,10 +105,11 @@ export const stateSchema = {
         },
       },
     },
-    pendingAlerts: { type: 'array', items: { type: 'object' } },
+    pendingAlerts: { type: 'array', maxItems: MAX_PENDING_ALERTS, items: { type: 'object' } },
     sentAlertIds: {
       type: 'array',
-      items: { type: 'object', additionalProperties: false, required: ['id', 'at'], properties: { id: { type: 'string' }, at: timestamp } },
+      maxItems: MAX_SENT_ALERT_IDS,
+      items: { type: 'object', additionalProperties: false, required: ['id', 'at'], properties: { id: { type: 'string', pattern: '^[A-Za-z0-9:_-]{1,100}$' }, at: timestamp } },
     },
     products: {
       type: 'object',
@@ -123,8 +129,8 @@ export const stateSchema = {
       additionalProperties: false,
       required: ['lastCauses'],
       properties: {
-        lastCauses: { type: 'array', items: { type: 'string' } },
-        measuredStores: { type: 'array', items: { type: 'string' } },
+        lastCauses: { type: 'array', maxItems: MAX_CAUSES, items: { type: 'string', pattern: CAUSE_PATTERN_SOURCE } },
+        measuredStores: { type: 'array', maxItems: MAX_CAUSES, items: { type: 'string', pattern: STORE_ID_SOURCE } },
         commitConflict: { type: 'boolean' },
         channelBroken: { type: 'boolean' },
         availability: {

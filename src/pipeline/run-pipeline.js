@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, readdirSync } from 'node:fs';
 import { resolveMonthlyRate } from '../core/compare.js';
 import { formatTimestamp, lastPoints, pointSeriesKey } from '../core/history.js';
@@ -7,9 +6,12 @@ import { recordProduct } from '../core/record.js';
 import { evaluateProduct } from '../core/rules.js';
 import { createStoreFetchContext } from '../http/context.js';
 import { NOTIFY_CAUSES, notifySummaryMarkdown, runNotify } from '../notify/notify.js';
+import { dedupeCauses } from '../notify/ops-issues.js';
 import { buildSite } from '../site/build.js';
+import { MAX_PENDING_ALERTS } from '../state/schema.js';
 import { loadState, saveState, STATE_PATH } from '../state/store.js';
 import { stores as defaultRegistry } from '../stores/index.js';
+import { productConfigHash } from './config-hash.js';
 import { selectConfig } from './config-source.js';
 import { measureProducts } from './measure.js';
 import { causeText, computeCauses } from './ops-causes.js';
@@ -165,7 +167,7 @@ export async function runPipeline(options = {}) {
       storeNames: Object.fromEntries(registry.map((store) => [store.id, store.displayName])),
       failingStores: reports.filter((report) => (report.outcomes.falla ?? 0) > 0).map((report) => report.store),
       availability: state.ops.availability?.value ?? null,
-      openNotices: openNoticesOf({ avisos, fallback: choice.kind === 'fallback', previous: state.ops.lastCauses }),
+      openNotices: openNoticesOf({ avisos, fallback: choice.kind === 'fallback', previous: state.ops.lastCauses, measuredStores: measuredStoresOf(reports) }),
     },
     outDir,
   );
@@ -228,14 +230,6 @@ function removeDroppedProducts(dataDir, productIds) {
 const eligibleKeys = (records) => records.filter((record) => record.eligible).map((record) => `${record.store}/${record.serie}`);
 
 /**
- * Hash of what defines a product (DRT 13.2): a change in it silences
- * `cambio_mejor_opcion` for one run.
- * @param {import('../config/types.js').Product} product
- * @returns {string} `sha256:<hex>`
- */
-const productConfigHash = (product) => `sha256:${createHash('sha256').update(JSON.stringify(product)).digest('hex')}`;
-
-/**
  * What the rules need about a product from the previous run, or undefined when
  * the state was lost or does not know the product (S-25, states older than F4):
  * then `mejor_vp` and `cambio_mejor_opcion` stay silent and the series alerts
@@ -243,24 +237,46 @@ const productConfigHash = (product) => `sha256:${createHash('sha256').update(JSO
  * @param {{ state: import('../state/schema.js').RunState, rebuilt: boolean, productId: string }} input
  * @returns {import('../core/rules.js').PreviousProductState | undefined}
  */
-function previousOf({ state, rebuilt, productId }) {
-  const stored = state.products?.[productId];
-  const eligible = state.eligible[productId];
+export function previousOf({ state, rebuilt, productId }) {
+  // Own keys only: a product id such as "constructor" must not read Object.prototype.
+  const stored = state.products !== undefined && Object.hasOwn(state.products, productId) ? state.products[productId] : undefined;
+  const eligible = Object.hasOwn(state.eligible, productId) ? state.eligible[productId] : undefined;
   if (rebuilt || stored === undefined || eligible === undefined) return undefined;
-  const best = state.prevBest[productId];
+  const best = Object.hasOwn(state.prevBest, productId) ? state.prevBest[productId] : undefined;
   return { eligible, r: stored.r, s: stored.s, configHash: stored.configHash, best: best === undefined ? null : { tipo: best.tipo, tienda: best.tienda, serie: best.serie } };
 }
 
 /**
  * Open notices shown in the site footer (DRT 18.4): the causes of this run plus
  * the ones only the notify step knows, as of the previous run.
- * @param {{ avisos: readonly string[], fallback: boolean, previous: readonly string[] }} input
+ * The count goes through the same `dedupeCauses` as the issues, so the footer
+ * matches the number of open `cuotear-ops` issues.
+ * @param {{ avisos: readonly string[], fallback: boolean, previous: readonly string[], measuredStores: readonly string[] }} input
  * @returns {number}
  */
-function openNoticesOf({ avisos, fallback, previous }) {
+function openNoticesOf({ avisos, fallback, previous, measuredStores }) {
   const carried = previous.filter((cause) => cause !== 'commit-conflicto' && NOTIFY_CAUSES.includes(/** @type {never} */ (cause)));
-  return new Set([...avisos, ...(fallback ? ['config-invalida'] : []), ...carried]).size;
+  return new Set(dedupeCauses([...avisos, ...(fallback ? ['config-invalida'] : []), ...carried], measuredStores)).size;
 }
+
+/**
+ * @param {readonly import('./measure.js').StoreReport[]} reports
+ * @returns {string[]} stores with at least one measured URL in this run
+ */
+const measuredStoresOf = (reports) => reports.filter((report) => report.urls > 0).map((report) => report.store);
+
+/** Causes only the notify step can know and that survive a run in which it did not run. */
+const CARRIED_CAUSES = new Set(['secretos-canal', 'inactividad', 'disponibilidad']);
+
+/**
+ * `ops.lastCauses` after the run step: the pipeline owns `robots:*` and
+ * `todas-tiendas-fallan` and replaces them; the causes of the notify step stay
+ * as they were until that step runs again, so a skipped or failed notify does
+ * not make an open issue look resolved in the footer.
+ * @param {{ previous: readonly string[], avisos: readonly string[] }} input
+ * @returns {string[]}
+ */
+const pipelineCauses = ({ previous, avisos }) => [...new Set([...previous.filter((cause) => CARRIED_CAUSES.has(cause)), ...avisos])].sort();
 
 /**
  * @param {{
@@ -288,7 +304,7 @@ function nextState({ state, choice, counters, views, rate, ctx, now, avisos, ale
   for (const view of views) {
     eligible[view.id] = eligibleKeys(view.records);
     const stores = storeInputs(Object.keys(view.urls), view.records, view.points);
-    const best = bestForState({ stores, r: rate.r, s, hold: state.prevBest[view.id] ?? null });
+    const best = bestForState({ stores, r: rate.r, s, hold: Object.hasOwn(state.prevBest, view.id) ? (state.prevBest[view.id] ?? null) : null });
     if (best !== null) prevBest[view.id] = best;
   }
   const sent = new Set(state.sentAlertIds.map((entry) => entry.id));
@@ -304,7 +320,8 @@ function nextState({ state, choice, counters, views, rate, ctx, now, avisos, ale
     prevBest,
     products: productStates,
     robots: ctx.robotsSnapshot(),
-    pendingAlerts: [...state.pendingAlerts, ...fresh],
-    ops: { ...state.ops, lastCauses: [...avisos], measuredStores: reports.filter((report) => report.urls > 0).map((report) => report.store), commitConflict: false },
+    // Bounded like the schema: when it overflows the oldest waiting alerts go first (they expire after 48 h anyway).
+    pendingAlerts: [...state.pendingAlerts, ...fresh].slice(-MAX_PENDING_ALERTS),
+    ops: { ...state.ops, lastCauses: pipelineCauses({ previous: state.ops.lastCauses, avisos }), measuredStores: measuredStoresOf(reports), commitConflict: false },
   };
 }

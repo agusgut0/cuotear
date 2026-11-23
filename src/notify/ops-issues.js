@@ -34,6 +34,10 @@ const FIXED_CAUSES = /** @type {const} */ ({
 });
 
 const ROBOTS_PATTERN = /^robots:[a-z0-9-]{2,30}$/;
+/** Store ids as they may appear in a `robots:<store>` cause (source of an anchored pattern). */
+export const STORE_ID_SOURCE = '^[a-z0-9-]{2,30}$';
+/** Source of an anchored pattern that accepts exactly the valid cause keys; the state schema reuses it. */
+export const CAUSE_PATTERN_SOURCE = `^(?:${Object.keys(FIXED_CAUSES).join('|')}|robots:[a-z0-9-]{2,30})$`;
 const MARKER_PATTERN = /<!-- cuotear-ops:cause=([a-z0-9:-]{1,60}) -->/;
 const RUNS_PATTERN = /<!-- cuotear-ops:runs=(\d{1,7}) -->/;
 

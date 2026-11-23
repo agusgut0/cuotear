@@ -36,6 +36,8 @@ export function createApi({ fetch: fetchFn, token, timeoutMs = REQUEST_TIMEOUT_M
           ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        // The token is in a header: a redirect must never carry it somewhere else.
+        redirect: 'error',
         signal: AbortSignal.timeout(timeoutMs),
       });
       /** @type {unknown} */

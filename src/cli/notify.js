@@ -35,7 +35,7 @@ async function main(argv) {
 
   const repo = env.GITHUB_REPOSITORY ?? '';
   const [owner = '', name = ''] = repo.split('/');
-  const siteUrl = env.CUOTEAR_SITE_URL ?? (owner === '' || name === '' ? undefined : `https://${owner.toLowerCase()}.github.io/${name}/`);
+  const siteUrl = env.CUOTEAR_SITE_URL || (owner === '' || name === '' ? undefined : `https://${owner.toLowerCase()}.github.io/${name}/`);
   const runId = env.GITHUB_RUN_ID ?? '';
   const cronStart = env.CUOTEAR_CRON_START === undefined ? undefined : new Date(env.CUOTEAR_CRON_START);
 
@@ -58,7 +58,14 @@ async function main(argv) {
   });
 
   // A lost state is not recreated here: with no run before it there is nothing to keep.
-  if (!dryRun && !loaded.rebuilt) saveState(outcome.state, statePath);
+  if (!dryRun && !loaded.rebuilt) {
+    try {
+      saveState(outcome.state, statePath);
+    } catch (error) {
+      // Log only the name: the alerts were already sent and the run must not fail for the state (RNF-15).
+      console.log(`::warning::cuotear: notify: the run state could not be saved (${error instanceof Error ? error.name : 'Error'})`);
+    }
+  }
   const summaryFile = env.GITHUB_STEP_SUMMARY;
   if (summaryFile !== undefined && summaryFile !== '') appendFileSync(summaryFile, notifySummaryMarkdown(outcome.summary));
 }

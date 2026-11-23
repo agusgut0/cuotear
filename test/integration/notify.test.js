@@ -3,10 +3,10 @@ import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { runPipeline } from '../../src/pipeline/run-pipeline.js';
-import { fakeClock } from '../helpers/fake-http.js';
+import { fakeClock, fakeFetch } from '../helpers/fake-http.js';
 import { fakeGithub } from '../helpers/fake-github.js';
 import { fakeTelegram, OK, TELEGRAM_ENV } from '../helpers/fake-telegram.js';
-import { oncityFetch, oncityFixtureWithCashPrice, PRODUCT_URL, runOptions, workspace } from '../helpers/pipeline.js';
+import { oncityFetch, oncityFixtureWithCashPrice, PRODUCT_URL, ROBOTS_URL, runOptions, workspace } from '../helpers/pipeline.js';
 
 const HISTORY_FILE = 'tcl-75t6c.jsonl';
 const REPO = 'owner/cuotear';
@@ -259,5 +259,91 @@ describe('alerts end to end: run pipeline + rules + Telegram + issues (fakes onl
     assert.match(page, /Avisos operativos abiertos: 1\./);
     assert.match(page, /Última ejecución: 22\/11\/2026/);
     assert.doesNotMatch(page, /secretos-canal/);
+  });
+});
+
+/**
+ * The same options without the in-process notification step (the CLI keeps it as its own step).
+ * @param {import('../../src/pipeline/run-pipeline.js').RunOptions} runOptionsWithNotify
+ * @returns {import('../../src/pipeline/run-pipeline.js').RunOptions}
+ */
+const withoutNotify = (runOptionsWithNotify) => Object.fromEntries(Object.entries(runOptionsWithNotify).filter(([key]) => key !== 'notify'));
+
+describe('review fixes end to end (Q3, Q4, Q5, Q1 and the commit conflict)', () => {
+  test('a re-detected change after an unpushed history commit is not sent twice, with commitConflict set', async () => {
+    const space = workspace(configText());
+    const telegram = fakeTelegram([OK]);
+    const gh = github();
+    await runPipeline(options(space, { telegram, gh, hours: 0 }));
+    const firstHistory = join(space.dir, 'first-history.jsonl');
+    copyFileSync(join(space.dataDir, HISTORY_FILE), firstHistory);
+
+    await runPipeline(options(space, { telegram, gh, hours: 6, price: 2_199_999, commitConflict: true }));
+    assert.equal(telegram.calls.length, 1);
+    assert.ok(state(space).ops.lastCauses.includes('commit-conflicto'));
+
+    // The push failed: the next checkout has the old file and the same drop is detected again (same id).
+    copyFileSync(firstHistory, join(space.dataDir, HISTORY_FILE));
+    await runPipeline(options(space, { telegram, gh, hours: 12, price: 2_199_999, commitConflict: true }));
+    assert.equal(telegram.calls.length, 1, 'no duplicate message');
+    assert.equal(state(space).sentAlertIds.length, 1);
+    assert.deepEqual(state(space).pendingAlerts, []);
+  });
+
+  test('Q5: reordering the keys of the product in the YAML keeps cambio_mejor_opcion working', async () => {
+    const reglas = '  reglas:\n    cambio_mejor_opcion: true\n';
+    const space = workspace(configText(reglas));
+    const telegram = fakeTelegram([OK]);
+    const gh = github();
+    await runPipeline(options(space, { telegram, gh, hours: 0 }));
+    const hashBefore = state(space).products['tcl-75t6c'].configHash;
+
+    // Same product, different order of keys.
+    writeFileSync(space.configPath, configText(reglas).replace(/ {2}- id: tcl-75t6c\n {4}nombre: (.*)\n {4}urls:\n {6}oncity: (.*)\n/, '  - urls:\n      oncity: $2\n    nombre: $1\n    id: tcl-75t6c\n'));
+    assert.match(readFileSync(space.configPath, 'utf8'), /- urls:/, 'the YAML was really reordered');
+    await runPipeline(options(space, { telegram, gh, hours: 6, price: 1_000_000 }));
+    assert.equal(state(space).products['tcl-75t6c'].configHash, hashBefore);
+    assert.equal(telegram.calls.length, 1);
+    assert.match(String(telegram.calls[0]?.body.text), /cambió la mejor opción/);
+  });
+
+  test('Q3: todas-tiendas-fallan together with robots:<store> of every measured store counts as one open notice in the footer', async () => {
+    const space = workspace(configText('', 'ninguno'));
+    const gh = github();
+    const fetcher = fakeFetch({ [ROBOTS_URL]: { status: 200, body: 'User-agent: *\nDisallow: /api/\n' } });
+    const lines = /** @type {string[]} */ ([]);
+    const base = options(space, { telegram: fakeTelegram([OK]), gh, hours: 0, env: {}, lines });
+    await runPipeline({ ...base, http: { ...base.http, fetchImpl: fetcher.impl } });
+    assert.deepEqual(state(space).ops.lastCauses, ['robots:oncity', 'todas-tiendas-fallan']);
+    const page = readFileSync(join(space.outDir, 'index.html'), 'utf8');
+    assert.match(page, /Avisos operativos abiertos: 1\./);
+  });
+
+  test('Q4: the causes of the notify step survive a run in which notify did not run; the pipeline ones are replaced', async () => {
+    const space = workspace(configText());
+    const gh = github();
+    // First run with notify and no secrets: secretos-canal is recorded.
+    await runPipeline(options(space, { telegram: fakeTelegram([OK]), gh, hours: 0, env: {} }));
+    assert.ok(state(space).ops.lastCauses.includes('secretos-canal'));
+
+    // A run without the notification step (the CLI keeps it as a separate step that may fail or be skipped).
+    await runPipeline(withoutNotify(options(space, { telegram: fakeTelegram([OK]), gh, hours: 6, env: {} })));
+    assert.deepEqual(state(space).ops.lastCauses, ['secretos-canal']);
+    const page = readFileSync(join(space.outDir, 'index.html'), 'utf8');
+    assert.match(page, /Avisos operativos abiertos: 1\./);
+  });
+
+  test('Q4: a pipeline cause that disappears is dropped while a carried one stays', async () => {
+    const space = workspace(configText());
+    const gh = github();
+    const fetcher = fakeFetch({ [ROBOTS_URL]: { status: 200, body: 'User-agent: *\nDisallow: /api/\n' } });
+    const blocked = options(space, { telegram: fakeTelegram([OK]), gh, hours: 0, env: {} });
+    await runPipeline({ ...blocked, http: { ...blocked.http, fetchImpl: fetcher.impl } });
+    assert.deepEqual(state(space).ops.lastCauses, ['robots:oncity', 'secretos-canal', 'todas-tiendas-fallan']);
+
+    const healthy = withoutNotify(options(space, { telegram: fakeTelegram([OK]), gh, hours: 30, env: {} }));
+    // The HTTP clock follows, so the 24 h copy of robots.txt expires and the store is read again.
+    await runPipeline({ ...healthy, http: { ...healthy.http, now: () => at(30).getTime() } });
+    assert.deepEqual(state(space).ops.lastCauses, ['secretos-canal']);
   });
 });

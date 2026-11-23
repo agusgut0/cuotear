@@ -296,3 +296,88 @@ describe('sending (DRT 13.5)', () => {
     assert.deepEqual(result, { sent: [], pending: [], unauthorized: false });
   });
 });
+
+describe('hardening of what is read from the state and of what is sent (S2, S3, S5)', () => {
+  const secrets = { token: TOKEN, chatId: CHAT_ID };
+
+  test('S2: isAlert accepts a sha256 hex id and ids made of letters, digits, colon, underscore and hyphen', () => {
+    const real = seriesAlert();
+    assert.match(real.id, /^[0-9a-f]{64}$/, 'real ids are sha256 hex digests');
+    assert.equal(isAlert(real), true);
+    assert.equal(isAlert({ ...real, id: 'Abc:def_ghi-123' }), true);
+    assert.equal(isAlert({ ...real, id: 'a'.repeat(100) }), true);
+  });
+
+  test('S2: isAlert rejects ids that could break a log line or a workflow command', () => {
+    const real = seriesAlert();
+    for (const id of ['', 'a'.repeat(101), 'a\nb', 'a b', 'a%0Ab', 'a/b', '<b>', 'a‮b', 42, null, undefined]) {
+      assert.equal(isAlert({ ...real, id }), false, `id ${JSON.stringify(id)}`);
+    }
+  });
+
+  test('S3: isAlert rejects a detectedAt that is not a UTC timestamp', () => {
+    const real = seriesAlert();
+    for (const detectedAt of ['', 'yesterday', '2026-11-23', '2026-11-23T12:00:00', '2026-13-45T99:99:99Z', '2026-11-23T12:00:00Z\n::error::x', 20261123]) {
+      assert.equal(isAlert({ ...real, detectedAt }), false, `detectedAt ${JSON.stringify(detectedAt)}`);
+    }
+    assert.equal(isAlert({ ...real, detectedAt: '2026-11-23T12:00:00.123Z' }), true);
+  });
+
+  test('S3: at most 10 messages are sent per run by default; the rest of the alerts stay pending, in order', async () => {
+    const clock = fakeClock();
+    const telegram = fakeTelegram([OK], clock.now);
+    // Every block is far larger than 3800 / 20 characters, so 200 alerts need many more than 10 messages.
+    const alerts = Array.from({ length: 200 }, (_, index) => seriesAlert({ prevT: `2026-11-22T${String(Math.floor(index / 60)).padStart(2, '0')}:${String(index % 60).padStart(2, '0')}:00Z` }));
+    const lines = /** @type {string[]} */ ([]);
+    const result = await sendAlerts({ alerts, secrets, context: context({ config: config('N'.repeat(110)) }), fetch: telegram.fetch, sleep: clock.sleep, now: clock.now, log: (line) => lines.push(line) });
+    assert.equal(telegram.calls.length, 10);
+    assert.ok(result.sent.length > 0 && result.pending.length > 0);
+    assert.equal(result.sent.length + result.pending.length, 200);
+    assert.deepEqual([...result.sent, ...result.pending], alerts.map((alert) => alert.id), 'order is kept: first the sent ones, then the pending ones');
+    assert.equal(result.unauthorized, false);
+    assert.ok(lines.some((line) => line.includes('limit of 10 message(s)')));
+  });
+
+  test('S3: maxMessages is configurable and the limit is not a failure (nothing is marked broken)', async () => {
+    const clock = fakeClock();
+    const telegram = fakeTelegram([OK], clock.now);
+    const alerts = Array.from({ length: 30 }, (_, index) => seriesAlert({ prevT: `2026-11-22T12:${String(index).padStart(2, '0')}:00Z` }));
+    const result = await sendAlerts({ alerts, secrets, context: context({ config: config('N'.repeat(110)) }), fetch: telegram.fetch, sleep: clock.sleep, now: clock.now, log: () => {}, maxMessages: 1 });
+    assert.equal(telegram.calls.length, 1);
+    assert.ok(result.pending.length > 0);
+    assert.equal(result.unauthorized, false);
+  });
+
+  test('onSent reports each accepted message right away', async () => {
+    const clock = fakeClock();
+    const telegram = fakeTelegram([OK], clock.now);
+    const reported = /** @type {string[]} */ ([]);
+    const alert = seriesAlert();
+    await sendAlerts({ alerts: [alert], secrets, context: context({ config: config('TV') }), fetch: telegram.fetch, sleep: clock.sleep, now: clock.now, log: () => {}, onSent: (ids) => reported.push(...ids) });
+    assert.deepEqual(reported, [alert.id]);
+  });
+
+  test('S5: the request does not follow redirects (the token is in the URL path)', async () => {
+    /** @type {RequestInit | undefined} */
+    let seen;
+    /** @type {typeof fetch} */
+    const spy = async (_input, init) => {
+      seen = init;
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    };
+    await sendAlerts({ alerts: [seriesAlert()], secrets, context: context({ config: config('TV') }), fetch: spy, sleep: async () => {}, log: () => {} });
+    assert.equal(seen?.redirect, 'error');
+  });
+
+  test('S5: a redirect answer is a failed send that keeps the alert pending and logs nothing sensitive', async () => {
+    const lines = /** @type {string[]} */ ([]);
+    /** @type {typeof fetch} */
+    const redirecting = async () => {
+      throw new TypeError(`redirect mode is set to error: https://evil.test/${TOKEN}`);
+    };
+    const alert = seriesAlert();
+    const result = await sendAlerts({ alerts: [alert], secrets, context: context({ config: config('TV') }), fetch: redirecting, sleep: async () => {}, log: (line) => lines.push(line) });
+    assert.deepEqual(result.pending, [alert.id]);
+    assert.ok(!lines.join('\n').includes('evil.test') && !lines.join('\n').includes(TOKEN));
+  });
+});
