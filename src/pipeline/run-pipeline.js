@@ -9,6 +9,7 @@ import { loadState, saveState, STATE_PATH } from '../state/store.js';
 import { stores as defaultRegistry } from '../stores/index.js';
 import { selectConfig } from './config-source.js';
 import { measureProducts } from './measure.js';
+import { causeText, computeCauses } from './ops-causes.js';
 import { settingsOf } from './settings.js';
 import { summaryLines, summaryMarkdown } from './summary.js';
 import { bestForState, buildView } from './view.js';
@@ -81,6 +82,9 @@ export async function runPipeline(options = {}) {
     if (failed > 0) log(`::warning::cuotear: ${report.store}: ${failed} of ${report.urls} URL(s) failed (${Object.keys(report.failures).join(', ')}); the last valid price is kept`);
   }
 
+  const avisos = computeCauses(reports);
+  for (const cause of avisos) log(`::error::cuotear: aviso ${cause}: ${causeText(cause)}`);
+
   const now = clock();
   let counters = state.series;
   /** @type {import('./view.js').ProductView[]} */
@@ -114,7 +118,7 @@ export async function runPipeline(options = {}) {
   if (!dryRun) totals.filesRemoved = removeDroppedProducts(dataDir, new Set(config.productos.map((product) => product.id)));
 
   if (!dryRun) {
-    saveState(nextState({ state, choice, counters, views, rate, ctx, now }), statePath);
+    saveState(nextState({ state, choice, counters, views, rate, ctx, now, avisos }), statePath);
   }
 
   buildSite(
@@ -140,6 +144,7 @@ export async function runPipeline(options = {}) {
     rate,
     s: settings.s,
     stores: reports,
+    avisos,
     ...totals,
     requests: ctx.requestCount(),
     durationMs: clock().getTime() - started.getTime(),
@@ -175,10 +180,11 @@ function removeDroppedProducts(dataDir, productIds) {
  *   rate: import('../core/compare.js').MonthlyRate,
  *   ctx: import('../http/client.js').FetchContext,
  *   now: Date,
+ *   avisos: readonly string[],
  * }} input
  * @returns {import('../state/schema.js').RunState}
  */
-function nextState({ state, choice, counters, views, rate, ctx, now }) {
+function nextState({ state, choice, counters, views, rate, ctx, now, avisos }) {
   const ids = new Set(views.map((view) => view.id));
   /** @type {import('../state/schema.js').RunState['eligible']} */
   const eligible = {};
@@ -197,5 +203,6 @@ function nextState({ state, choice, counters, views, rate, ctx, now }) {
     eligible,
     prevBest,
     robots: ctx.robotsSnapshot(),
+    ops: { ...state.ops, lastCauses: [...avisos] },
   };
 }

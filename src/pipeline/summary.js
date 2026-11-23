@@ -1,3 +1,5 @@
+import { causeText } from './ops-causes.js';
+
 /**
  * Run summary (DRT 18.2): printed to the log and, in GitHub Actions, appended
  * to `$GITHUB_STEP_SUMMARY`. It never contains downloaded text.
@@ -9,6 +11,7 @@
  * @property {import('../core/compare.js').MonthlyRate} rate
  * @property {0|1} s
  * @property {import('./measure.js').StoreReport[]} stores
+ * @property {string[]} avisos operational causes detected in this run (RNF-15)
  * @property {number} pointsAdded
  * @property {number} pointsPurged
  * @property {number} seriesOpened
@@ -55,6 +58,7 @@ export function summaryLines(summary) {
     `[cuotear] config: ${summary.configKind === 'repo' ? 'repository file' : 'last valid configuration (the repository file is invalid)'}, ${summary.products} product(s)`,
     `[cuotear] inflation: ${rateText(summary.rate, summary.s)}`,
     ...(summary.stateRebuilt ? ['[cuotear] state: rebuilt (failure counters restarted)'] : []),
+    ...summary.avisos.map((cause) => `[cuotear] notice ${cause}: ${causeText(cause)}`),
     ...summary.stores.map((report) => `[cuotear] store ${report.store}: ${report.urls} URL(s), ${outcomesText(report)}, ${report.requests} request(s), ${report.ms} ms`),
     `[cuotear] history: +${summary.pointsAdded} point(s), -${summary.pointsPurged} purged, ${summary.seriesOpened} series opened, ${summary.seriesClosed} closed, ${summary.filesWritten} file(s) written, ${summary.filesRemoved} removed`,
     `[cuotear] requests: ${summary.requests} (robots.txt included), duration ${seconds(summary.durationMs)}`,
@@ -80,5 +84,6 @@ export function summaryMarkdown(summary) {
     '| --- | --- | --- | --- | --- |',
     ...rows,
     '',
+    ...(summary.avisos.length > 0 ? ['### Operational notices', '', '| Cause | Detail |', '| --- | --- |', ...summary.avisos.map((cause) => `| \`${cause}\` | ${causeText(cause)} |`), ''] : []),
   ].join('\n');
 }

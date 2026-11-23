@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { formatIssue, validateConfig, validateConfigFile } from '../../src/config/validate.js';
-import { stores } from '../../src/stores/index.js';
 import { checkVtexProductUrl } from '../../src/stores/url.js';
 
-const ACTIVE = stores.map((store) => store.id).join(', ');
+// Literal on purpose: losing a store from the registry must break these tests.
+const ACTIVE = 'oncity, carrefour, naldo, megatone';
 
 /** @param {number} i */
 const productYaml = (i) => `  - id: producto-${i}

@@ -700,6 +700,10 @@ Decisión: ADR-0009.
 - Si la API de issues falla, solo log; nunca hace fallar la ejecución. Los issues son públicos (repo público): no contienen secretos ni datos personales (RNF-14).
 - En `dry_run` no se tocan issues.
 
+**Alcance de F3 (cálculo de causas).** En F3 el pipeline solo **calcula y muestra** las causas `robots:<tienda>` y `todas-tiendas-fallan` (`src/pipeline/ops-causes.js`, función pura `computeCauses`): línea `::error::cuotear: aviso <causa>: <texto fijo>` en el log, sección "Operational notices" en el resumen y `ops.lastCauses` en el estado (en `dry_run` se calculan y muestran, pero el estado no se guarda). Los issues (la reconciliación de esta sección) llegan en F4. Un aviso nunca hace fallar la ejecución (RNF-15).
+- `robots:<tienda>`: la tienda tiene al menos una URL con falla de clase `robots` en la ejecución (ruta prohibida, o robots.txt inalcanzable y sin copia usable, caso en que se trata todo como prohibido).
+- `todas-tiendas-fallan`: se midió al menos una URL y **todas** terminaron en `falla` (RNF-12). **Supuesto:** las fallas de clase `robots` cuentan como falla, de modo que si robots.txt bloquea todas las URLs aparecen ambas causas. **Supuesto:** con 0 URLs medidas no hay causa. **Supuesto:** el texto del log y del resumen es fijo y en inglés (idioma de los logs); el título del issue en F4 se redacta en es-AR.
+
 ## 14. Sitio estático (RF-17, RNF-03, RNF-06, RNF-08; Q-10)
 
 Decisión: ADR-0011 — **generador propio sin framework**, HTML pre-renderizado, **sin JavaScript en el navegador**, desplegado desde artefacto.
@@ -945,7 +949,7 @@ Cada fase termina con PRs pequeños, CI en verde y la documentación (DAF/DRT/AD
 
 ### Después del MVP
 
-- **F3 — Resto de tiendas:** perfiles `carrefour` y `naldo` (VTEX, sin simulación de checkout: **Supuesto**, ver 6.2; Cetrogar fuera de v1 hasta un adaptador HTML, ver 6.4); adaptador `megatone`; `cetrogar` según F1; selección de vendedor; avisos `robots:<tienda>` y `todas-tiendas-fallan`. Revisión de ToS por el dueño (cierre de Naldo/Cetrogar).
+- **F3 — Resto de tiendas:** perfiles `carrefour` y `naldo` (VTEX, sin simulación de checkout: **Supuesto**, ver 6.2; Cetrogar fuera de v1 hasta un adaptador HTML, ver 6.4); adaptador `megatone`; `cetrogar` según F1; selección de vendedor; avisos `robots:<tienda>` y `todas-tiendas-fallan` calculados y mostrados en log, resumen y estado (los issues `cuotear-ops`, RNF-15(b), quedan diferidos a F4). Revisión de ToS por el dueño (cierre de Naldo/Cetrogar).
 - **F4 — Alertas y avisos:** `core/rules` (todos los criterios de RF-22, RN-12, RN-13), Telegram (escape, partición, ritmo, dedupe, pendientes), `ops-issues` (todas las causas), disponibilidad (RNF-10), inactividad (R-04).
 - **F5 — REM, inglés y accesibilidad:** inflación REM (BCRA v4, variable 29) con respaldo; i18n `en` completo y mensajes de alerta en `en`; revisión WCAG 2.2 AA manual (teclado, lector de pantalla, contraste) + `html-validate`.
 - **F6 — Endurecimiento:** límites de tamaño del historial (45/50/100 MB) con tests, CodeQL opcional, revisión de permisos y SHAs, guía "agregar una tienda" en README, traducción del DRT al inglés al cerrar la fase (CLAUDE.md).
@@ -997,7 +1001,7 @@ Cada fase termina con PRs pequeños, CI en verde y la documentación (DAF/DRT/AD
 | RNF-12 Degradación por tienda | `Promise.allSettled` por tienda, presupuestos 30 s / 5 min / 6 min | Test con 4 de 5 tiendas fallando |
 | RNF-13 Tamaño/retención | `core/history` (tamaño, umbrales), avisos | Tests con tamaños simulados |
 | RNF-14 Sin datos personales | Secrets, esquema, test de higiene | CI |
-| RNF-15 Aviso operativo | `notify/ops-issues`, anotaciones, resumen | Tests con API falsa |
+| RNF-15 Aviso operativo | `pipeline/ops-causes` (F3), `notify/ops-issues` (F4), anotaciones, resumen | F3: tests unitarios y de integración de las causas; F4: tests con API falsa |
 | R-01 Bloqueo de runners | `http` (clasificación, sin evasión), sección 15 | — |
 | R-02 Mercado Libre | ADR-0014 (diferido) | — |
 | R-03 Cambios de HTML/API | Validación de respuestas, fixtures, falla `parse` + N | — |
