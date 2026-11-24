@@ -173,7 +173,7 @@ describe('detail page: chart and table (RF-17, RNF-08)', () => {
   });
 
   test('the table has a caption and scoped headers', () => {
-    assert.match(page, /<caption>Historial de Smart TV: datos del gráfico<\/caption>/);
+    assert.match(page, /<caption id="history-table-caption">Historial de Smart TV: datos del gráfico<\/caption>/);
     assert.match(page, /<th scope="col">Fecha<\/th>/);
   });
 

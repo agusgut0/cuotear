@@ -9,6 +9,10 @@ Recorded or synthetic store responses used by the contract tests (`test/contract
 - `tcl-75t6c.expected.json`: reviewed expected adapter output (`StoreResult` without `meta`). Checked by hand against the store figures of the spike: list 2.299.999, cash = debit line (Cabal Debito, Maestro, Visa Electron) at the same value (0 %), Visa 15x, Mastercard 18x, Naranja 12x, all with total 2.299.999.
 - `synthetic-*.json` (and `synthetic-challenge.html`): **hand-made** edge cases generated from a minimal VTEX shape, each with a `.expected.json` written independently of the adapter: no stock / price 0, empty array (no offer), missing card, unknown and store-branded payment systems, two sellers (and tie-breaks), cash discounts and ties, interest and inconsistent totals, several items (`skuId`), prompt-injection text in store data, malformed JSON, wrong shape and a captcha/challenge page. They are not real captures.
 
+## `bcra/`
+
+- `variable-29.json`: **synthetic**, built from the shape and facts verified in DRT 13.4 (BCRA Estadisticas Monetarias v4.0, variable 29, newest first). The two newest values (2026-10-31 = 21,8 and 2026-09-30 = 21,1) are the verified ones; the older two are invented. Not a real capture.
+
 ## `carrefour/`
 
 Both are **real** captures of the VTEX catalog API (2026-11-23, `npm run fixtures:capture -- carrefour <url> <case>`), trimmed like the On City one. In both, the `CARREFOUR` seller is present with price 0 and no stock next to one marketplace seller, which covers the two-seller case of ADR 0006. Their `expected.json` were checked by hand.

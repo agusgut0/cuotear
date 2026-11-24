@@ -49,6 +49,27 @@ describe('run state (DRT 9, ADR-0004)', () => {
     });
   });
 
+  test('an invalid inflation value alone is dropped: the rest of the state is kept and nothing is rebuilt', () => {
+    for (const inflation of [{ fuente: 'rem', anualPct: 1001, fecha: '2026-10-31', obtainedAt: '2026-11-22T12:17:41Z' }, { fuente: 'rem', anualPct: 5 }, 'x']) {
+      withStateFile((path) => {
+        saveState(emptyState(), path);
+        writeFileSync(path, JSON.stringify({ ...fullState(), inflation }));
+        const loaded = loadState(path);
+        assert.equal(loaded.rebuilt, false);
+        assert.equal(loaded.state.inflation, undefined);
+        const expected = { ...fullState() };
+        delete expected.inflation;
+        assert.deepEqual({ ...loaded.state }, expected);
+      });
+    }
+    // another invalid field next to a bad inflation still rebuilds
+    withStateFile((path) => {
+      saveState(emptyState(), path);
+      writeFileSync(path, JSON.stringify({ ...fullState(), series: { k: { failures: -1 } }, inflation: 'x' }));
+      assert.equal(loadState(path).reason, 'invalid_schema');
+    });
+  });
+
   test('saving creates the .state directory and refuses an invalid state', () => {
     withStateFile((path) => {
       saveState(emptyState(), path);

@@ -1,10 +1,10 @@
 import { appendFileSync, existsSync, readdirSync } from 'node:fs';
-import { resolveMonthlyRate } from '../core/compare.js';
 import { formatTimestamp, lastPoints, pointSeriesKey } from '../core/history.js';
 import { HISTORY_DIR, readHistory, removeHistory, writeHistory } from '../core/history-files.js';
 import { recordProduct } from '../core/record.js';
 import { evaluateProduct } from '../core/rules.js';
 import { createStoreFetchContext } from '../http/context.js';
+import { resolveInflation } from '../inflation/resolve.js';
 import { NOTIFY_CAUSES, notifySummaryMarkdown, runNotify } from '../notify/notify.js';
 import { dedupeCauses } from '../notify/ops-issues.js';
 import { buildSite } from '../site/build.js';
@@ -82,9 +82,11 @@ export async function runPipeline(options = {}) {
 
   const { config } = choice;
   const settings = settingsOf(config);
-  const rate = resolveMonthlyRate(settings.inflation);
 
   const ctx = createStoreFetchContext(registry, { ...http, robots: state.robots, log: (message) => log(`[cuotear] http: ${message}`) });
+  // At most one BCRA query per run (and per day, via state.inflation); a dry run queries but saves nothing.
+  const now = clock();
+  const { rate, inflation } = await resolveInflation({ settings: settings.inflation, state, ctx, now, log });
   const { measurements, reports } = await measureProducts({ config, registry, ctx, codigoPostal: settings.codigoPostal, budgets, log, debug, ...(http.now === undefined ? {} : { now: http.now }) });
   for (const report of reports) {
     const failed = Object.values(report.failures).reduce((sum, count) => sum + count, 0);
@@ -94,7 +96,6 @@ export async function runPipeline(options = {}) {
   const avisos = computeCauses(reports);
   for (const cause of avisos) log(`::error::cuotear: aviso ${cause}: ${causeText(cause)}`);
 
-  const now = clock();
   const runTimestamp = formatTimestamp(now);
   let counters = state.series;
   /** @type {import('./view.js').ProductView[]} */
@@ -152,7 +153,7 @@ export async function runPipeline(options = {}) {
 
   if (!dryRun) totals.filesRemoved = removeDroppedProducts(dataDir, new Set(config.productos.map((product) => product.id)));
 
-  const next = nextState({ state, choice, counters, views, rate, ctx, now, avisos, alerts, productStates, reports, s: settings.s });
+  const next = nextState({ state, choice, counters, views, rate, inflation, ctx, now, avisos, alerts, productStates, reports, s: settings.s });
   if (!dryRun) saveState(next, statePath);
 
   buildSite(
@@ -285,6 +286,7 @@ const pipelineCauses = ({ previous, avisos }) => [...new Set([...previous.filter
  *   counters: import('../core/series.js').Counters,
  *   views: readonly import('./view.js').ProductView[],
  *   rate: import('../core/compare.js').MonthlyRate,
+ *   inflation: import('../state/schema.js').RunState['inflation'],
  *   ctx: import('../http/client.js').FetchContext,
  *   now: Date,
  *   avisos: readonly string[],
@@ -295,7 +297,7 @@ const pipelineCauses = ({ previous, avisos }) => [...new Set([...previous.filter
  * }} input
  * @returns {import('../state/schema.js').RunState}
  */
-function nextState({ state, choice, counters, views, rate, ctx, now, avisos, alerts, productStates, reports, s }) {
+function nextState({ state, choice, counters, views, rate, inflation, ctx, now, avisos, alerts, productStates, reports, s }) {
   const ids = new Set(views.map((view) => view.id));
   /** @type {import('../state/schema.js').RunState['eligible']} */
   const eligible = {};
@@ -311,14 +313,18 @@ function nextState({ state, choice, counters, views, rate, ctx, now, avisos, ale
   const waiting = new Set(state.pendingAlerts.map((alert) => /** @type {{ id?: unknown }} */ (alert).id));
   // New alerts join the pending ones unless already sent or waiting (DRT 13.3); `notify` delivers them.
   const fresh = alerts.filter((alert) => !sent.has(alert.id) && !waiting.has(alert.id));
+  // `inflation` comes only from resolveInflation: an unusable stored value must not survive through the spread.
+  const kept = { ...state };
+  delete kept.inflation;
   return {
-    ...state,
+    ...kept,
     lastRunAt: now.toISOString().replace(/\.\d{3}Z$/, 'Z'),
     ...(choice.kind === 'repo' ? { lastValidConfig: { hash: choice.hash, config: /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (choice.config)) } } : {}),
     series: Object.fromEntries(Object.entries(counters).filter(([key]) => ids.has(key.slice(0, key.indexOf('|'))))),
     eligible,
     prevBest,
     products: productStates,
+    ...(inflation === undefined ? {} : { inflation }),
     robots: ctx.robotsSnapshot(),
     // Bounded like the schema: when it overflows the oldest waiting alerts go first (they expire after 48 h anyway).
     pendingAlerts: [...state.pendingAlerts, ...fresh].slice(-MAX_PENDING_ALERTS),

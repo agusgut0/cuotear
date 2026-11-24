@@ -1,5 +1,5 @@
 /**
- * CI check: builds the site from the On City fixture (fake fetch, temporary
+ * CI check: builds the site (es-AR and en trees) from the On City fixture (fake fetch, temporary
  * directory, no network) and validates every generated page with
  * html-validate and the repository configuration (`.htmlvalidate.json`).
  */
@@ -25,6 +25,13 @@ await runPipeline({ ...runOptions(space, oncityFetch()), dryRun: true, log: () =
 
 let failed = 0;
 const files = htmlFiles(space.outDir);
+// Both language trees must be present and validated (es-AR at the root, English under en/).
+for (const required of [join(space.outDir, 'index.html'), join(space.outDir, 'en', 'index.html'), join(space.outDir, 'en', '404.html')]) {
+  if (!files.includes(required)) {
+    console.error(`${required}: missing from the generated site`);
+    failed += 1;
+  }
+}
 for (const file of files) {
   const problems = await htmlProblems(readFileSync(file, 'utf8'));
   for (const problem of problems) console.error(`${file}: ${problem}`);

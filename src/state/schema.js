@@ -87,7 +87,7 @@ export const stateSchema = {
       type: 'object',
       additionalProperties: false,
       required: ['fuente', 'anualPct', 'fecha', 'obtainedAt'],
-      properties: { fuente: { enum: ['rem', 'manual'] }, anualPct: { type: 'number', minimum: 0 }, fecha: { type: 'string' }, obtainedAt: timestamp },
+      properties: { fuente: { enum: ['rem', 'manual'] }, anualPct: { type: 'number', minimum: 0, maximum: 1000 }, fecha: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, obtainedAt: timestamp },
     },
     robots: {
       type: 'object',

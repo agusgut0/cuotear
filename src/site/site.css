@@ -127,6 +127,22 @@ main,
   margin: 0;
 }
 
+.lang {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.lang a,
+.lang [aria-current] {
+  display: inline-block;
+  min-block-size: 1.5rem;
+  min-inline-size: 1.5rem;
+}
+
+.lang [aria-current] {
+  font-weight: 700;
+}
+
 .brand {
   font-size: var(--step-1);
   font-weight: 700;
@@ -295,8 +311,13 @@ figcaption {
   font-size: 0.9em;
 }
 
+.chart-scroll {
+  overflow-x: auto;
+}
+
 .chart {
   width: 100%;
+  min-width: 36rem;
   height: auto;
   background: var(--surface);
   border-radius: var(--radius);
@@ -314,11 +335,6 @@ figcaption {
 
 .line {
   stroke-width: 2.5;
-}
-
-.mk {
-  stroke: var(--surface);
-  stroke-width: 1;
 }
 
 .s0 {
@@ -342,6 +358,11 @@ figcaption {
   stroke: var(--c3);
   fill: var(--c3);
   stroke-dasharray: 10 3 2 3;
+}
+
+.mk {
+  stroke: var(--surface);
+  stroke-width: 1;
 }
 
 .mk.s1,

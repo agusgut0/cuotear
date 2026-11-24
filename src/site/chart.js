@@ -122,7 +122,8 @@ function swatch(style) {
  *   money: (cents: number) => string,
  *   shortDate: (ms: number) => string,
  * }} input
- * @returns {import('./html.js').SafeHtml} the `<svg>` followed by a textual legend
+ * @returns {import('./html.js').SafeHtml} the `<svg>` followed by a textual legend (the caller wraps it in a horizontally
+ * scrollable region: the SVG keeps a minimum width so its text stays legible, WCAG 1.4.4/1.4.10)
  */
 export function renderChart({ series, title, description, money, shortDate }) {
   const values = series.flatMap((entry) => entry.runs.flatMap((run) => run.points.map((point) => point.v)));
