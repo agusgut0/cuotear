@@ -25,5 +25,19 @@ First case: Smart TV TCL 75T6C.
 - GitHub Pages — static dashboard, UI in es-AR and en
 - Cost: zero
 
+## Adding a store
+Details: DRT section 22 (specs are in Spanish) and ADR-0006. The core, comparison engine, site and alerts do not change.
+
+1. **Review ToS and robots.txt first.** Read the store's terms and `robots.txt`; the product page or JSON endpoint you will request must not be disallowed. Record the result in `docs/tos-review.md` (the owner confirms it manually). Run an access spike from a GitHub runner (no secrets): a 403 or bot challenge means the store is not added, and blocks are never bypassed (see ADR-0014 for the deferred candidates).
+2. **Write the adapter.** The contract is `StoreRegistration` in `src/stores/index.js`: `id`, `displayName`, `hosts`, `status` (`vigente` | `provisional`), `validateUrl(url)`, `captureUrls(url)` and `measure(ctx, url, options)`. `measure` must return a `StoreResult` (`src/stores/types.js`): only numbers (centavos), enumerations and adapter-generated messages, never text copied from the store (downloaded content is untrusted). Fetch only through the `FetchContext` (`ctx.get`), which enforces the allowlist, robots.txt and rate limit.
+   - VTEX store: add a profile (`id`, `displayName`, `hosts`, `simulacion: false`, `status`) in `src/stores/vtex/profiles.js`.
+   - Any other store: create `src/stores/<id>/index.js` exporting the registration (see `src/stores/megatone/index.js`, which reads the JSON-LD of the product page).
+3. **Register it** in `src/stores/index.js`: add the VTEX profile to the `createVtexStore` list, or add the new registration to the `stores` array. Registering enables the id under `productos[].urls` in the config. Its `hosts` also enter the fetch allowlist and the robots.txt check automatically (`createStoreFetchContext` in `src/http/context.js`).
+4. **Record fixtures and write contract tests.** Capture with `npm run fixtures:capture -- <store> <product url> <case-name>`. It makes real requests through the production `FetchContext`, so run it rarely and on purpose. It saves a trimmed `test/fixtures/<store>/<case>.json` (`.html` for Megatone-style stores; extend the `isHtml` check in `scripts/fixtures-capture.js` if your store also serves HTML) plus a `<case>.expected.json` skeleton. Verify every value in the skeleton by hand against the store, then remove its `_note` key. Add `test/contract/<store>.test.js` modeled on the existing ones, with the real fixture plus synthetic cases (no stock, no price, malformed body, injection text, bot challenge).
+5. **Use it in the config.** Add the product URL under `productos[].urls.<id>` in `config/cuotear.yaml`, then run `npm run validate-config`.
+6. **Check and document.** Run `npm test`, `npm run lint` and `npm run typecheck`. Update the DAF (RF-04 list of stores), the log and, if the decision is significant, an ADR.
+
+To retire a store, remove it from the registry: its URLs become invalid in the config. Document it.
+
 ## License
 [MIT](LICENSE) © Agustin Gutierrez
