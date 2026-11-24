@@ -1,5 +1,5 @@
 import { createTranslator } from '../i18n/index.js';
-import { createFormatters } from '../site/format.js';
+import { createFormatters, intlLocale } from '../site/format.js';
 import { cardOfSerie, CONTADO } from '../core/series.js';
 
 /**
@@ -168,6 +168,18 @@ export function isAlert(value) {
 }
 
 /**
+ * A site base URL usable to build detail links: https, no credentials, no query
+ * string and no fragment (they would end up in the middle of the built path).
+ * @param {unknown} value
+ * @returns {string | null} the URL with a trailing slash, or null
+ */
+export function siteBaseUrl(value) {
+  const href = safeHref(value, null);
+  if (href === null || typeof value !== 'string' || value.includes('?') || value.includes('#')) return null;
+  return href.endsWith('/') ? href : `${href}/`;
+}
+
+/**
  * HTML block of one alert, or null when its product is no longer in the configuration.
  * @param {Alert} alert
  * @param {RenderContext} ctx
@@ -177,10 +189,12 @@ export function renderAlert(alert, ctx) {
   const product = ctx.config.productos.find((entry) => entry.id === alert.productId);
   if (product === undefined) return null;
   const t = createTranslator(ctx.language);
-  const fmt = createFormatters(ctx.language === 'en' ? 'en-US' : 'es-AR');
+  const fmt = createFormatters(intlLocale(ctx.language));
   const e = escapeTelegramHtml;
   const name = boundedName(product.nombre);
-  const siteLink = ctx.siteUrl === undefined ? null : safeHref(`${ctx.siteUrl.replace(/\/?$/, '/')}p/${alert.productId}/`, null);
+  // The es-AR site is the root, the English one lives under /en/ (DRT 14.1).
+  const siteBase = ctx.siteUrl === undefined ? null : siteBaseUrl(ctx.siteUrl);
+  const siteLink = siteBase === null ? null : safeHref(`${siteBase}${ctx.language === 'en' ? 'en/' : ''}p/${alert.productId}/`, null);
   const detail = siteLink === null ? [] : [link(siteLink, t('alert.link.site'))];
   /** @param {string} store */
   const storeLink = (store) => {

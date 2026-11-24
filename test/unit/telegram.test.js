@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { buildBestChangeAlert, buildMejorVpAlert, buildSeriesAlert } from '../../src/core/alerts.js';
-import { escapeTelegramHtml, isAlert, MAX_MESSAGE_CHARS, readSecrets, renderAlert, safeHref, sendAlerts, splitBlocks } from '../../src/notify/telegram.js';
+import { escapeTelegramHtml, isAlert, MAX_MESSAGE_CHARS, readSecrets, renderAlert, safeHref, sendAlerts, siteBaseUrl, splitBlocks } from '../../src/notify/telegram.js';
 import { fakeClock } from '../helpers/fake-http.js';
 import { CHAT_ID, fakeTelegram, OK, TELEGRAM_ENV, TOKEN } from '../helpers/fake-telegram.js';
 
@@ -82,6 +82,50 @@ describe('rendering an alert', () => {
     assert.match(text, /^Cash$/m);
     assert.match(text, /Single payment by bank transfer, no extra discount/);
     assert.match(text, /Before ARS\s?2,299,999/);
+    assert.match(text, /\(-ARS\s?100,000, -4\.35%\)/);
+    assert.match(text, /Rules: price drop/);
+    assert.match(text, /<a href="https:\/\/www\.oncity\.com\/producto\/p">View at On City<\/a>/);
+    assert.doesNotMatch(text, /Antes|Reglas|Ver /);
+  });
+
+  test('the detail link follows the alert language: root for es-AR, /en/ for en (DRT 13.5)', () => {
+    const spanish = /** @type {string} */ (renderAlert(seriesAlert(), context({ config: config('TV') })));
+    const english = /** @type {string} */ (renderAlert(seriesAlert(), context({ config: config('TV'), language: 'en' })));
+    assert.match(spanish, /<a href="https:\/\/owner\.github\.io\/cuotear\/p\/tv\/">Ver detalle<\/a>/);
+    assert.match(english, /<a href="https:\/\/owner\.github\.io\/cuotear\/en\/p\/tv\/">View details<\/a>/);
+    assert.doesNotMatch(spanish, /\/en\//);
+    // a site URL without the trailing slash gets the same paths
+    const bare = /** @type {string} */ (renderAlert(seriesAlert(), context({ config: config('TV'), language: 'en', siteUrl: 'https://owner.github.io/cuotear' })));
+    assert.match(bare, /href="https:\/\/owner\.github\.io\/cuotear\/en\/p\/tv\/"/);
+  });
+
+  test('a site URL with a query string or fragment yields no detail link; siteBaseUrl normalizes the rest', () => {
+    for (const siteUrl of ['https://owner.github.io/cuotear/?x=1', 'https://owner.github.io/cuotear#top', 'https://owner.github.io/cuotear?', 'http://owner.github.io/cuotear/']) {
+      assert.doesNotMatch(/** @type {string} */ (renderAlert(seriesAlert(), context({ config: config('TV'), siteUrl }))), /Ver detalle/);
+      assert.equal(siteBaseUrl(siteUrl), null);
+    }
+    assert.equal(siteBaseUrl('https://owner.github.io/cuotear'), 'https://owner.github.io/cuotear/');
+    assert.equal(siteBaseUrl('https://owner.github.io/cuotear/'), 'https://owner.github.io/cuotear/');
+  });
+
+  test('every alert kind renders in English without Spanish text, and escaping holds in both languages', () => {
+    const best = buildBestChangeAlert({
+      productId: 'tv',
+      prevT: '2026-11-22T12:17:41Z',
+      previous: { tipo: 'cuotas', tienda: 'oncity', serie: 'visa:15', valueCents: 200_000_000 },
+      current: { tipo: 'contado', tienda: 'oncity', serie: 'contado', valueCents: 190_000_000 },
+      detectedAt: '2026-11-23T12:00:00Z',
+    });
+    const vp = buildMejorVpAlert({ productId: 'tv', prevT: '2026-11-22T12:17:41Z', prevCents: 300_000_000, currentCents: 190_000_000, realCents: 195_000_000, objetivoCents: 200_000_000, detectedAt: '2026-11-23T12:00:00Z' });
+    for (const language of /** @type {const} */ (['es-AR', 'en'])) {
+      for (const alert of [seriesAlert(), seriesAlert({ serie: 'visa:12' }), best, vp]) {
+        const text = /** @type {string} */ (renderAlert(alert, context({ language })));
+        assertOnlyAllowedTags(text);
+        assert.doesNotMatch(text, /<a href="https:\/\/evil/);
+        assert.match(text, /&lt;b&gt;Smart&lt;\/b&gt; TV &amp; &quot;Co&quot;/);
+        if (language === 'en') assert.doesNotMatch(text, /Antes|Ahora|Reglas|Ver |cuotas|Contado|cambió/);
+      }
+    }
   });
 
   test('best-option and best-VP alerts render', () => {

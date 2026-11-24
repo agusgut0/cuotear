@@ -3,7 +3,15 @@
 export const TIME_ZONE = 'America/Argentina/Buenos_Aires';
 
 /**
- * @param {string} [locale]
+ * Intl locale of a UI language: English uses en-US conventions, while amounts
+ * stay in Argentine pesos and are labelled `ARS` (never `$`, which is ambiguous).
+ * @param {import('../i18n/index.js').Language} language
+ * @returns {string}
+ */
+export const intlLocale = (language) => (language === 'en' ? 'en-US' : 'es-AR');
+
+/**
+ * @param {string} [locale] an Intl locale (see `intlLocale`)
  */
 export function createFormatters(locale = 'es-AR') {
   const money = new Intl.NumberFormat(locale, { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });

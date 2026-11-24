@@ -35,7 +35,9 @@ const seconds = (ms) => `${(ms / 1000).toFixed(1)} s`;
  * @returns {string}
  */
 function rateText(rate, s) {
-  return rate.r === null ? 'none (no verdict, nominal comparison only)' : `${(rate.r * 100).toFixed(3)} % monthly (${rate.origin}), first installment in month ${s}`;
+  if (rate.r === null) return 'none (no verdict, nominal comparison only)';
+  const rem = rate.annualPct === undefined ? '' : `, REM ${rate.annualPct} % annual as of ${rate.fecha ?? '?'}`;
+  return `${(rate.r * 100).toFixed(3)} % monthly (${rate.origin}${rem}), first installment in month ${s}`;
 }
 
 /**

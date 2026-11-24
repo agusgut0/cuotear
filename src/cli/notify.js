@@ -2,6 +2,7 @@ import { appendFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { selectConfig } from '../pipeline/config-source.js';
 import { notifySummaryMarkdown, runNotify } from '../notify/notify.js';
+import { siteBaseUrl } from '../notify/telegram.js';
 import { loadState, saveState, STATE_PATH } from '../state/store.js';
 import { stores } from '../stores/index.js';
 
@@ -35,7 +36,13 @@ async function main(argv) {
 
   const repo = env.GITHUB_REPOSITORY ?? '';
   const [owner = '', name = ''] = repo.split('/');
-  const siteUrl = env.CUOTEAR_SITE_URL || (owner === '' || name === '' ? undefined : `https://${owner.toLowerCase()}.github.io/${name}/`);
+  let siteUrl = owner === '' || name === '' ? undefined : `https://${owner.toLowerCase()}.github.io/${name}/`;
+  if (env.CUOTEAR_SITE_URL) {
+    // Same rule as the alert links: a query string or fragment would corrupt the built paths.
+    const custom = siteBaseUrl(env.CUOTEAR_SITE_URL);
+    if (custom === null) console.log('::warning::cuotear: notify: CUOTEAR_SITE_URL is not a plain https URL (no query string or fragment); the default site URL is used');
+    else siteUrl = custom;
+  }
   const runId = env.GITHUB_RUN_ID ?? '';
   const cronStart = env.CUOTEAR_CRON_START === undefined ? undefined : new Date(env.CUOTEAR_CRON_START);
 

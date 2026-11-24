@@ -43,7 +43,9 @@
  *
  * @typedef {Object} MonthlyRate
  * @property {number|null} r monthly rate as a fraction (0.03 = 3 %); null when no source is available
- * @property {'manual'|'backup'|'none'} origin
+ * @property {'rem'|'rem-stale'|'backup'|'manual'|'none'} origin source: REM current, REM stale (older than 70 days or last stored value), manual fallback under `fuente: rem`, manual by choice, or none
+ * @property {number} [annualPct] annual REM value in percent (REM origins only)
+ * @property {string} [fecha] ISO date of the REM datum (REM origins only)
  */
 
 export const MAX_INSTALLMENTS = 72;
@@ -94,10 +96,10 @@ export function annualToMonthlyRate(annualPct) {
 }
 
 /**
- * Resolves the monthly rate from the configured inflation source. Only the
- * manual source exists for now: with `fuente: manual` the manual value is
- * used; with `fuente: rem` (not implemented yet, so treated as unavailable)
- * the manual value acts as backup; without a manual value there is no rate
+ * Resolves the monthly rate from the manual part of the configuration (the
+ * REM part lives in `src/inflation/resolve.js`, which calls this as its
+ * fallback): with `fuente: manual` the manual value is used; with
+ * `fuente: rem` (REM unavailable here) the manual value acts as backup; without a manual value there is no rate
  * and the verdict is "sin veredicto" (DRT 13.4, RF-21).
  * @param {{ fuente: 'rem'|'manual', manual?: import('../config/types.js').ManualInflation }} inflation
  * @returns {MonthlyRate}

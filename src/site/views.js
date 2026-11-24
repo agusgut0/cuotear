@@ -16,6 +16,7 @@ import { externalHref, html } from './html.js';
  * @property {import('../i18n/index.js').Translator} t
  * @property {import('./format.js').Formatters} fmt
  * @property {SiteModel} model
+ * @property {import('../i18n/index.js').Language} language language of the page being rendered
  */
 
 const HOUR_MS = 3_600_000;
@@ -99,15 +100,15 @@ function differenceCells(comparison, { t, fmt }) {
     const empty = html`<span aria-hidden="true">—</span><span class="sr-only">${t('cell.empty')}</span>`;
     return html`<td class="num">${empty}</td><td class="num">${empty}</td>`;
   }
-  const vp = comparison.vpCents === null || comparison.difVpPct === null ? html`—` : html`${fmt.money(Math.round(comparison.vpCents))}<span class="note">${fmt.signedPercent(comparison.difVpPct)}</span>`;
+  const vp = comparison.vpCents === null || comparison.difVpPct === null ? html`<span aria-hidden="true">—</span><span class="sr-only">${t('cell.empty')}</span>` : html`${fmt.money(Math.round(comparison.vpCents))}<span class="note">${fmt.signedPercent(comparison.difVpPct)}</span>`;
   return html`<td class="num">${fmt.signedMoney(comparison.difCents)}<span class="note">${fmt.signedPercent(comparison.difPct)}</span></td><td class="num">${vp}</td>`;
 }
 
 /**
  * Table of one store: the cash price and the interest-free option of each card.
- * @param {{ view: ProductView, store: string, ctx: RenderContext, detail: boolean }} input
+ * @param {{ view: ProductView, store: string, ctx: RenderContext, detail: boolean, level?: 2 | 3 }} input `level` is the heading level of the store (h3 under a product h2 on the home, h2 under the h1 on the detail page)
  */
-export function storeTable({ view, store, ctx, detail }) {
+export function storeTable({ view, store, ctx, detail, level = 3 }) {
   const { t, fmt, model } = ctx;
   const records = view.records.filter((record) => record.store === store);
   const storeComparison = view.comparison.stores.find((entry) => entry.store === store);
@@ -144,12 +145,14 @@ export function storeTable({ view, store, ctx, detail }) {
     );
   }
 
-  return html`<section class="store" aria-labelledby="store-${view.id}-${store}">
-<h3 id="store-${view.id}-${store}">${name}${href === null ? '' : html` <a class="store-link" href="${href}" rel="noopener noreferrer">${t('store.open', { store: name })}</a>`}</h3>
-<div class="table-wrap"><table>
-<caption class="sr-only">${name}</caption>
+  const nameId = `store-${view.id}-${store}`;
+  const heading = html`<span id="${nameId}">${name}</span>${href === null ? '' : html` <a class="store-link" href="${href}" rel="noopener noreferrer">${t('store.open', { store: name })}</a>`}`;
+  return html`<section class="store" aria-labelledby="${nameId}">
+${level === 2 ? html`<h2>${heading}</h2>` : html`<h3>${heading}</h3>`}
+<section class="table-wrap" aria-labelledby="${nameId}-caption" tabindex="0"><table>
+<caption id="${nameId}-caption" class="sr-only">${t('store.table', { store: name })}</caption>
 <thead><tr><th scope="col">${t('col.option')}</th><th scope="col">${t('col.price')}</th><th scope="col">${t('col.verdict')}</th>${detail ? html`<th scope="col" class="num">${t('col.dif')}</th><th scope="col" class="num">${t('col.vp')}</th>` : ''}</tr></thead>
 <tbody>${rows}</tbody>
-</table></div>
+</table></section>
 </section>`;
 }

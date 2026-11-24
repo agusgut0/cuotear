@@ -68,7 +68,14 @@ export function loadState(path = STATE_PATH) {
     version = candidate.schemaVersion;
   }
   if (version !== STATE_SCHEMA_VERSION) return lost('unknown_version');
-  if (!isRunState(candidate)) return lost('invalid_schema');
+  if (!isRunState(candidate)) {
+    // The inflation value is a re-queryable cache: when only it is invalid, drop it and keep the rest of the state.
+    if (!Object.hasOwn(candidate, 'inflation')) return lost('invalid_schema');
+    const rest = { ...candidate };
+    delete rest.inflation;
+    if (!isRunState(rest)) return lost('invalid_schema');
+    return { state: rest, rebuilt: false, reason: null, notice: null };
+  }
   return { state: candidate, rebuilt: false, reason: null, notice: null };
 }
 
