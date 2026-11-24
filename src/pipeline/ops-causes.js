@@ -35,6 +35,8 @@ export function causeText(cause) {
     'config-invalida': 'the repository configuration is invalid; the last valid configuration is used',
     'config-ausente': 'there is no valid configuration; nothing is measured or published',
     'commit-conflicto': 'the history commit could not be pushed; the next run recomputes it',
+    'historial-45mb': 'the history is at 45 MB or more; the limit is soft up to 100 MB',
+    'historial-100mb': 'the history is above 100 MB; new points are no longer persisted until it shrinks',
     inactividad: 'the repository has no commits for more than 45 days; scheduled runs may be suspended',
     disponibilidad: 'the availability of the scheduled runs in the last 30 days is below 95 %',
   });

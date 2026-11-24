@@ -1,6 +1,7 @@
 import { appendFileSync, existsSync, readdirSync } from 'node:fs';
 import { formatTimestamp, lastPoints, pointSeriesKey } from '../core/history.js';
 import { HISTORY_DIR, readHistory, removeHistory, writeHistory } from '../core/history-files.js';
+import { limitHistory } from '../core/history-size.js';
 import { recordProduct } from '../core/record.js';
 import { evaluateProduct } from '../core/rules.js';
 import { createStoreFetchContext } from '../http/context.js';
@@ -94,7 +95,6 @@ export async function runPipeline(options = {}) {
   }
 
   const avisos = computeCauses(reports);
-  for (const cause of avisos) log(`::error::cuotear: aviso ${cause}: ${causeText(cause)}`);
 
   const runTimestamp = formatTimestamp(now);
   let counters = state.series;
@@ -104,6 +104,8 @@ export async function runPipeline(options = {}) {
   const alerts = [];
   /** @type {NonNullable<import('../state/schema.js').RunState['products']>} */
   const productStates = {};
+  /** @type {{ id: string, previous: import('../core/history.js').HistoryPoint[], proposed: import('../core/history.js').HistoryPoint[] }[]} */
+  const histories = [];
   const totals = { pointsAdded: 0, pointsPurged: 0, seriesOpened: 0, seriesClosed: 0, filesWritten: 0, filesRemoved: 0 };
 
   for (const product of config.productos) {
@@ -125,7 +127,7 @@ export async function runPipeline(options = {}) {
     totals.pointsPurged += recorded.removed;
     totals.seriesOpened += recorded.added.filter((point) => point.estado === 'ok' && !known.has(pointSeriesKey(point))).length;
     totals.seriesClosed += recorded.added.filter((point) => point.estado === 'cerrada').length;
-    if (!dryRun && writeHistory(dataDir, product.id, recorded.points)) totals.filesWritten += 1;
+    histories.push({ id: product.id, previous: points, proposed: recorded.points });
 
     const hash = productConfigHash(product);
     alerts.push(
@@ -150,6 +152,15 @@ export async function runPipeline(options = {}) {
     views.push(buildView({ product, records: recorded.series, points: recorded.points, r: rate.r, s: settings.s, marginalPct: settings.marginalPct }));
   }
   if (alerts.length > 0) log(`[cuotear] alerts: ${alerts.length} detected`);
+
+  // Size limits (DRT 8.2): measured on the proposed files; above the hard limit no new point is persisted.
+  const limited = limitHistory({ products: histories, now, retentionMonths: settings.retentionMonths });
+  if (limited.cause !== null) avisos.push(limited.cause);
+  if (limited.frozen) totals.pointsAdded = 0;
+  if (!dryRun) {
+    for (const [id, points] of limited.writes) if (writeHistory(dataDir, id, points)) totals.filesWritten += 1;
+  }
+  for (const cause of avisos) log(`::error::cuotear: aviso ${cause}: ${causeText(cause)}`);
 
   if (!dryRun) totals.filesRemoved = removeDroppedProducts(dataDir, new Set(config.productos.map((product) => product.id)));
 
