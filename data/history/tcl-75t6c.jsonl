@@ -8,3 +8,7 @@
 {"t":"2026-11-25T21:38:46Z","tienda":"oncity","serie":"visa:15","estado":"ok","total":179999900,"cuota":11999993,"n":15}
 {"t":"2026-11-26T08:11:15Z","tienda":"oncity","serie":"visa:15","estado":"cerrada"}
 {"t":"2026-11-26T08:11:15Z","tienda":"oncity","serie":"visa:18","estado":"ok","total":179999900,"cuota":9999994,"n":18}
+{"t":"2026-11-26T21:28:01Z","tienda":"oncity","serie":"contado","estado":"sin_stock"}
+{"t":"2026-11-26T21:28:01Z","tienda":"oncity","serie":"mastercard:18","estado":"sin_stock"}
+{"t":"2026-11-26T21:28:01Z","tienda":"oncity","serie":"naranja:12","estado":"sin_stock"}
+{"t":"2026-11-26T21:28:01Z","tienda":"oncity","serie":"visa:18","estado":"sin_stock"}
