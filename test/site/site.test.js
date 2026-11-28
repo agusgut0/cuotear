@@ -72,10 +72,10 @@ describe('home page', () => {
     const { home } = build(siteModel([twoPrices()], { builtAt: new Date(at(7)) }));
     assert.match(home, /\$ 900\.000/);
     assert.match(home, /Pago único por transferencia bancaria, sin descuento adicional/);
-    assert.match(home, /12 cuotas sin interés de \$ 75\.000/);
+    assert.match(home, /12 cuotas sin interés de<\/span> <strong class="price">\$ 75\.000/);
     assert.match(home, /Total \$ 900\.000/);
     assert.match(home, /badge-cuotas">Conviene cuotas/);
-    assert.match(home, /<tr class="is-best">/);
+    assert.match(home, /<li class="offer is-best">/);
     assert.match(home, /Mejor opción/);
   });
 

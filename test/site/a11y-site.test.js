@@ -31,7 +31,8 @@ describe('scrollable regions (2.1.1)', () => {
     test(`${path}: every scroll container is a focusable named region (a named <section> has the region role, as html-validate prefers it to role="region") and ids are unique`, () => {
       const page = read(path);
       const scrollers = [...page.matchAll(/<section class="(?:table-wrap|chart-scroll)"[^>]*>/g)].map((match) => match[0]);
-      assert.ok(scrollers.length >= 1);
+      // Only the detail pages have scroll containers (chart, history table); the home has no tables.
+      assert.ok(path.includes('p/') ? scrollers.length >= 1 : true);
       const all = ids(page);
       assert.equal(new Set(all).size, all.length, 'duplicate ids');
       for (const tag of scrollers) {

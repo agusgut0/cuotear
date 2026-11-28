@@ -54,7 +54,7 @@ describe('English tree (DRT 14.1, 14.4)', () => {
     const home = site.read('en/index.html');
     assert.match(home, /Cash and installment prices/);
     assert.match(home, /Skip to content/);
-    assert.match(home, /Installments are cheaper at On City/);
+    assert.match(home, /(Visa|Mastercard|Naranja X) at On City/);
     assert.match(home, /12 interest-free installments of/);
     assert.match(home, /Single payment by bank transfer, no extra discount/);
     assert.doesNotMatch(home, /Conviene|Contado|Saltar al contenido|cuotas sin interés/);

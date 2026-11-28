@@ -1,7 +1,7 @@
 import { cardOfSerie } from '../core/series.js';
 import { hasEnoughPoints, plotSeries, renderChart } from './chart.js';
 import { html } from './html.js';
-import { headline, storeTable } from './views.js';
+import { headline, storeOffers, verdictClass } from './views.js';
 
 /**
  * Page templates (DRT 14): plain semantic HTML, no JavaScript, one
@@ -90,14 +90,17 @@ ${model.usingFallbackConfig ? html`<p class="notice" role="note">${t('site.fallb
 ${body}
 </main>
 <footer class="site-footer">
-<p>${lastValid === undefined ? t('footer.no_measurement') : t('footer.fresh', { date: fmt.dateTime(lastValid) })}</p>
-<p>${failing === '' ? t('footer.stores_ok') : t('footer.stores_failing', { stores: failing })}</p>
-<p>${t('footer.last_run', { date: fmt.dateTime(model.builtAt) })}</p>
-<p>${rate}</p>
-${model.availability === null || model.availability === undefined ? '' : html`<p>${t('footer.availability', { value: fmt.percent(model.availability) })}</p>`}
-<p>${model.openNotices === undefined || model.openNotices === 0 ? t('footer.notices_none') : t('footer.notices_open', { count: model.openNotices })}</p>
-<p>${t('footer.currency')}</p>
-<p>${t('footer.disclaimer')}</p>
+<div class="site-footer-inner">
+<ul class="status-list">
+<li class="${lastValid === undefined ? 'is-warn' : 'is-ok'}">${lastValid === undefined ? t('footer.no_measurement') : t('footer.fresh', { date: fmt.dateTime(lastValid) })}</li>
+<li class="${failing === '' ? 'is-ok' : 'is-warn'}">${failing === '' ? t('footer.stores_ok') : t('footer.stores_failing', { stores: failing })}</li>
+<li>${t('footer.last_run', { date: fmt.dateTime(model.builtAt) })}</li>
+<li>${rate}</li>
+${model.availability === null || model.availability === undefined ? '' : html`<li>${t('footer.availability', { value: fmt.percent(model.availability) })}</li>`}
+<li class="${model.openNotices === undefined || model.openNotices === 0 ? 'is-ok' : 'is-warn'}">${model.openNotices === undefined || model.openNotices === 0 ? t('footer.notices_none') : t('footer.notices_open', { count: model.openNotices })}</li>
+</ul>
+<p class="disclaimer">${t('footer.currency')} ${t('footer.disclaimer')}</p>
+</div>
 </footer>
 </body>
 </html>
@@ -112,13 +115,13 @@ export function homePage(ctx) {
   const { t, model } = ctx;
   const body =
     model.products.length === 0
-      ? html`<h1>${t('home.empty.title')}</h1><p>${t('home.empty.text', { file: 'config/cuotear.yaml' })}</p>`
+      ? html`<section class="empty"><h1>${t('home.empty.title')}</h1><p>${t('home.empty.text', { file: 'config/cuotear.yaml' })}</p></section>`
       : html`<h1>${t('home.title')}</h1><p class="lead">${t('site.tagline')}</p>${model.products.map(
-          (view) => html`<article class="product" aria-labelledby="product-${view.id}">
+          (view) => html`<article class="product v-${verdictClass(view)}" aria-labelledby="product-${view.id}">
 <h2 id="product-${view.id}"><a href="p/${view.id}/">${view.nombre}</a></h2>
 ${headline(view, ctx)}
-${Object.keys(view.urls).map((store) => storeTable({ view, store, ctx, detail: false }))}
-<p><a href="p/${view.id}/">${t('product.details')}<span class="sr-only">: ${view.nombre}</span></a></p>
+${Object.keys(view.urls).map((store) => storeOffers({ view, store, ctx, detail: false }))}
+<p class="actions"><a class="button" href="p/${view.id}/">${t('product.details')}<span class="sr-only">: ${view.nombre}</span></a></p>
 </article>`,
         )}`;
   return layout({ ctx, title: `${t('site.name')} — ${t('home.title')}`, description: t('site.tagline'), path: '', body });
@@ -146,7 +149,7 @@ function historySection(view, ctx) {
   const series = plotSeries(view.points, lastValidAt, label);
 
   const chart = hasEnoughPoints(series)
-    ? html`<figure><section class="chart-scroll" aria-labelledby="chart-title" tabindex="0">${renderChart({
+    ? html`<figure class="chart-card"><section class="chart-scroll" aria-labelledby="chart-title" tabindex="0">${renderChart({
         series,
         title: t('chart.title', { product: view.nombre }),
         description: series
@@ -183,10 +186,12 @@ function historySection(view, ctx) {
  */
 export function detailPage(view, ctx) {
   const { t } = ctx;
-  const body = html`<nav aria-label="${t('nav.breadcrumb')}"><a href="../../">${t('product.back')}</a></nav>
+  const body = html`<nav aria-label="${t('nav.breadcrumb')}"><a href="../../" class="back">${t('product.back')}</a></nav>
+<article class="product product-detail v-${verdictClass(view)}">
 <h1>${view.nombre}</h1>
 ${headline(view, ctx)}
-${Object.keys(view.urls).map((store) => storeTable({ view, store, ctx, detail: true, level: 2 }))}
+${Object.keys(view.urls).map((store) => storeOffers({ view, store, ctx, detail: true, level: 2 }))}
+</article>
 ${historySection(view, ctx)}`;
   return layout({ ctx, title: `${view.nombre} — ${t('site.name')}`, description: t('site.tagline'), path: `p/${view.id}/`, body });
 }
@@ -197,5 +202,5 @@ ${historySection(view, ctx)}`;
  */
 export function notFoundPage(ctx) {
   const { t } = ctx;
-  return layout({ ctx, title: `${t('notfound.title')} — ${t('site.name')}`, description: t('site.tagline'), path: '404.html', body: html`<h1>${t('notfound.title')}</h1><p>${t('notfound.text')}</p>` });
+  return layout({ ctx, title: `${t('notfound.title')} — ${t('site.name')}`, description: t('site.tagline'), path: '404.html', body: html`<section class="empty empty-404"><h1>${t('notfound.title')}</h1><p>${t('notfound.text')}</p></section>` });
 }

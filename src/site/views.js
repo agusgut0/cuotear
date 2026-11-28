@@ -3,7 +3,7 @@ import { CARDS } from '../stores/types.js';
 import { externalHref, html } from './html.js';
 
 /**
- * Presentation of one product: the verdict headline and one table per store
+ * Presentation of one product: the verdict hero and one list of offers per store
  * (RF-17, RF-20, RF-21, RN-06, S-30). Every dynamic text goes through the
  * escaping `html` tag; downloaded text never reaches this module (only
  * numbers, enumerations and the product name of the configuration).
@@ -45,6 +45,18 @@ function conditionText(point, { t, fmt }) {
 }
 
 /**
+ * Verdict modifier of a product card (`v-cuotas`, `v-contado`, `v-none`).
+ * @param {ProductView} view
+ * @returns {'cuotas' | 'contado' | 'none'}
+ */
+export function verdictClass(view) {
+  const { best, verdict } = view.comparison;
+  if (best === null) return 'none';
+  return verdict === 'cuotas' || verdict === 'contado' ? verdict : best.tipo;
+}
+
+/**
+ * Verdict hero: badge, best option and the three key figures.
  * @param {ProductView} view
  * @param {RenderContext} ctx
  */
@@ -53,106 +65,94 @@ export function headline(view, { t, fmt, model }) {
   const storeName = (/** @type {string} */ id) => model.storeNames[id] ?? id;
   const { best } = comparison;
   if (best === null) {
-    return html`<p class="headline"><span class="badge badge-none">${t('verdict.sin_veredicto')}</span> ${model.rate.r === null ? t('product.reason_rate') : t('product.reason_data')}</p>`;
+    return html`<div class="verdict"><p class="verdict-flags"><span class="badge badge-none">${t('verdict.sin_veredicto')}</span></p><p class="verdict-reason">${model.rate.r === null ? t('product.reason_rate') : t('product.reason_data')}</p></div>`;
   }
-  const text = best.tipo === 'contado' ? t('product.headline.contado', { store: storeName(best.store) }) : t('product.headline.cuotas', { store: storeName(best.store), card: t(`card.${best.card}`), n: best.n });
-  const detail =
+  const text = best.tipo === 'contado' ? t('product.best.contado', { store: storeName(best.store) }) : t('product.best.cuotas', { store: storeName(best.store), card: t(`card.${best.card}`) });
+  const installments = best.tipo === 'contado' ? '' : html`<span class="note">${t('product.best.n', { n: best.n })}</span>`;
+  const figures =
     comparison.pcStarCents !== null && comparison.vpStarCents !== null && comparison.difVpPct !== null
-      ? t('product.compare', { pc: fmt.money(comparison.pcStarCents), vp: fmt.money(Math.round(comparison.vpStarCents)), dif: fmt.signedPercent(comparison.difVpPct) })
+      ? html`<dl class="figures"><div><dt>${t('product.fig.cash')}</dt><dd>${fmt.money(comparison.pcStarCents)}</dd></div><div><dt>${t('product.fig.pv')}</dt><dd>${fmt.money(Math.round(comparison.vpStarCents))}</dd></div><div class="figure-key"><dt>${t('product.fig.dif')}</dt><dd>${fmt.signedPercent(comparison.difVpPct)}</dd></div></dl>`
       : '';
-  return html`<p class="headline"><span class="badge badge-${best.tipo}">${t(`verdict.${comparison.verdict}`)}</span> ${comparison.marginal ? html`<span class="tag">${t('verdict.marginal')}</span> ` : ''}<strong>${text}</strong><br /><span class="note">${detail}</span></p>`;
+  return html`<div class="verdict"><p class="verdict-flags"><span class="badge badge-${best.tipo}">${t(`verdict.${comparison.verdict}`)}</span>${comparison.marginal ? html` <span class="tag">${t('verdict.marginal')}</span>` : ''}</p><p class="verdict-best"><strong>${text}</strong>${installments}</p>${figures}</div>`;
 }
 
 /**
- * Cell of a series that has no usable number: never an invented value (RF-17).
- * @param {SeriesRecord | undefined} record
+ * Marker of a figure that is absent inside an offer that has data (RF-17).
  * @param {RenderContext} ctx
  */
-function noNumber(record, { t }) {
-  return html`<span class="state">${record?.status === 'sin_stock' ? t('status.sin_stock') : t('status.sin_datos')}</span>`;
+function dash({ t }) {
+  return html`<span aria-hidden="true">—</span><span class="sr-only">${t('cell.empty')}</span>`;
 }
 
 /**
- * @param {{ record: SeriesRecord | undefined, point: import('../core/history.js').HistoryPoint | undefined, value: import('./html.js').SafeHtml, ctx: RenderContext }} input
+ * One offer of a store. Without data it collapses to its name and a state; the
+ * best offer is marked with text, not only with colour.
+ * @param {{ name: string, record: SeriesRecord | undefined, point: import('../core/history.js').HistoryPoint | undefined, price: import('./html.js').SafeHtml, isBest: boolean, comparison?: import('../core/compare.js').OptionComparison | null, figures?: boolean, storeMeasured: string | undefined, ctx: RenderContext }} input
  */
-function priceCell({ record, point, value, ctx }) {
+function offer({ name, record, point, price, isBest, comparison = null, figures = false, storeMeasured, ctx }) {
   const { t, fmt, model } = ctx;
-  if (record === undefined || point === undefined || (record.status !== 'valida' && record.status !== 'fallida')) return noNumber(record, ctx);
-  const stale = isStale(record, model);
-  return html`${value}<span class="note">${t('cell.measured', { date: fmt.dateTime(record.lastValidAt ?? point.t) })}</span>${record.status === 'fallida' ? html`<span class="tag tag-warn">${t('state.failed')}</span>` : ''}${stale ? html`<span class="tag tag-warn">${t('state.stale')}</span>` : ''}`;
-}
-
-/**
- * @param {import('../core/compare.js').OptionComparison | null | undefined} comparison
- * @param {RenderContext} ctx
- */
-function verdictCell(comparison, { t }) {
-  if (comparison === null || comparison === undefined) return html`<span aria-hidden="true">—</span><span class="sr-only">${t('cell.empty')}</span>`;
-  return html`<span class="badge badge-${comparison.verdict}">${t(`verdict.${comparison.verdict}`)}</span>${comparison.marginal ? html` <span class="tag">${t('verdict.marginal')}</span>` : ''}`;
-}
-
-/**
- * @param {import('../core/compare.js').OptionComparison | null | undefined} comparison
- * @param {RenderContext} ctx
- */
-function differenceCells(comparison, { t, fmt }) {
-  if (comparison === null || comparison === undefined) {
-    const empty = html`<span aria-hidden="true">—</span><span class="sr-only">${t('cell.empty')}</span>`;
-    return html`<td class="num">${empty}</td><td class="num">${empty}</td>`;
+  if (record === undefined || point === undefined || (record.status !== 'valida' && record.status !== 'fallida')) {
+    return html`<li class="offer is-empty"><p class="offer-head"><span class="offer-name">${name}</span> <span class="state">${record?.status === 'sin_stock' ? t('status.sin_stock') : t('status.sin_datos')}</span></p></li>`;
   }
-  const vp = comparison.vpCents === null || comparison.difVpPct === null ? html`<span aria-hidden="true">—</span><span class="sr-only">${t('cell.empty')}</span>` : html`${fmt.money(Math.round(comparison.vpCents))}<span class="note">${fmt.signedPercent(comparison.difVpPct)}</span>`;
-  return html`<td class="num">${fmt.signedMoney(comparison.difCents)}<span class="note">${fmt.signedPercent(comparison.difPct)}</span></td><td class="num">${vp}</td>`;
+  const measuredAt = record.lastValidAt ?? point.t;
+  const stale = isStale(record, model);
+  const flags = html`${isBest ? html`<strong class="best">${t('tag.best')}</strong> ` : ''}${comparison === null ? '' : html`<span class="badge badge-${comparison.verdict}">${t(`verdict.${comparison.verdict}`)}</span>${comparison.marginal ? html` <span class="tag">${t('verdict.marginal')}</span>` : ''}`}`;
+  const vp = comparison === null || comparison.vpCents === null || comparison.difVpPct === null ? dash(ctx) : html`${fmt.money(Math.round(comparison.vpCents))} <span class="note">${fmt.signedPercent(comparison.difVpPct)}</span>`;
+  const detail =
+    figures === false
+      ? ''
+      : comparison === null
+        ? html`<dl class="figures figures-sm"><div><dt>${t('col.dif')}</dt><dd>${dash(ctx)}</dd></div><div><dt>${t('col.vp')}</dt><dd>${dash(ctx)}</dd></div></dl>`
+        : html`<dl class="figures figures-sm"><div><dt>${t('col.dif')}</dt><dd>${fmt.signedMoney(comparison.difCents)} <span class="note">${fmt.signedPercent(comparison.difPct)}</span></dd></div><div><dt>${t('col.vp')}</dt><dd>${vp}</dd></div></dl>`;
+  return html`<li class="offer${isBest ? ' is-best' : ''}"><p class="offer-head"><span class="offer-name">${name}</span><span class="offer-flags">${flags}</span></p><div class="offer-body">${price}${measuredAt === storeMeasured ? '' : html`<p class="note">${t('cell.measured', { date: fmt.dateTime(measuredAt) })}</p>`}${record.status === 'fallida' ? html`<p><span class="tag tag-warn">${t('state.failed')}</span></p>` : ''}${stale ? html`<p><span class="tag tag-warn">${t('state.stale')}</span></p>` : ''}</div>${detail}</li>`;
 }
 
 /**
- * Table of one store: the cash price and the interest-free option of each card.
+ * Offers of one store: the cash price and the interest-free option of each card.
  * @param {{ view: ProductView, store: string, ctx: RenderContext, detail: boolean, level?: 2 | 3 }} input `level` is the heading level of the store (h3 under a product h2 on the home, h2 under the h1 on the detail page)
  */
-export function storeTable({ view, store, ctx, detail, level = 3 }) {
+export function storeOffers({ view, store, ctx, detail, level = 3 }) {
   const { t, fmt, model } = ctx;
   const records = view.records.filter((record) => record.store === store);
   const storeComparison = view.comparison.stores.find((entry) => entry.store === store);
   const { best } = view.comparison;
   const name = model.storeNames[store] ?? store;
   const href = externalHref(view.urls[store] ?? '');
+  const storeMeasured = records.map((record) => record.lastValidAt ?? '').filter((value) => value !== '').sort().at(-1);
 
   const contado = records.find((record) => record.serie === 'contado');
   const contadoPoint = contado === undefined ? undefined : lastOkPoint(view.points, store, 'contado');
   const contadoBest = best?.tipo === 'contado' && best.store === store;
 
-  /** @type {import('./html.js').SafeHtml[]} */
-  const rows = [
-    html`<tr${contadoBest ? html` class="is-best"` : ''}><th scope="row">${t('option.contado')}</th><td>${priceCell({
+  const items = [
+    offer({
+      name: t('option.contado'),
       record: contado,
       point: contadoPoint,
-      value: contadoPoint === undefined ? html`` : html`<strong class="price">${fmt.money(contadoPoint.valor ?? 0)}</strong><span class="note">${conditionText(contadoPoint, ctx)}</span>`,
+      price: contadoPoint === undefined ? html`` : html`<p class="offer-price"><strong class="price">${fmt.money(contadoPoint.valor ?? 0)}</strong></p><p class="note">${conditionText(contadoPoint, ctx)}</p>`,
+      isBest: contadoBest,
+      storeMeasured,
       ctx,
-    })}</td><td>${contadoBest ? html`<strong class="best">${t('tag.best')}</strong>` : html`<span aria-hidden="true">—</span><span class="sr-only">${t('cell.empty')}</span>`}</td>${detail ? html`<td class="num"><span aria-hidden="true">—</span><span class="sr-only">${t('cell.empty')}</span></td><td class="num"><span aria-hidden="true">—</span><span class="sr-only">${t('cell.empty')}</span></td>` : ''}</tr>`,
+    }),
   ];
 
   for (const card of CARDS) {
     const record = records.find((entry) => entry.serie.startsWith(`${card}:`) && entry.status !== 'cerrada');
     const point = record === undefined ? undefined : lastOkPoint(view.points, store, record.serie);
-    const offer = storeComparison?.cards.find((entry) => entry.card === card);
+    const entry = storeComparison?.cards.find((candidate) => candidate.card === card);
     const isBest = best?.tipo === 'cuotas' && best.store === store && best.card === card && point?.n === best.n;
-    const value =
+    const price =
       point?.n === undefined || point.cuota === undefined || point.total === undefined
         ? html``
-        : html`<strong class="price">${t('cell.installments', { n: point.n, cuota: fmt.money(point.cuota) })}</strong><span class="note">${t('cell.total', { total: fmt.money(point.total) })}</span>`;
-    const comparison = record?.eligible ? offer?.comparison : null;
-    rows.push(
-      html`<tr${isBest ? html` class="is-best"` : ''}><th scope="row">${t(`card.${card}`)}</th><td>${priceCell({ record, point, value, ctx })}</td><td>${isBest ? html`<strong class="best">${t('tag.best')}</strong> ` : ''}${verdictCell(comparison, ctx)}</td>${detail ? differenceCells(comparison, ctx) : ''}</tr>`,
-    );
+        : html`<p class="offer-price"><span class="offer-label">${t('cell.installments_label', { n: point.n })}</span> <strong class="price">${fmt.money(point.cuota)}</strong></p><p class="note">${t('cell.total', { total: fmt.money(point.total) })}</p>`;
+    items.push(offer({ name: t(`card.${card}`), record, point, price, isBest, comparison: record?.eligible ? (entry?.comparison ?? null) : null, figures: detail, storeMeasured, ctx }));
   }
 
   const nameId = `store-${view.id}-${store}`;
   const heading = html`<span id="${nameId}">${name}</span>${href === null ? '' : html` <a class="store-link" href="${href}" rel="noopener noreferrer">${t('store.open', { store: name })}</a>`}`;
   return html`<section class="store" aria-labelledby="${nameId}">
 ${level === 2 ? html`<h2>${heading}</h2>` : html`<h3>${heading}</h3>`}
-<section class="table-wrap" aria-labelledby="${nameId}-caption" tabindex="0"><table>
-<caption id="${nameId}-caption" class="sr-only">${t('store.table', { store: name })}</caption>
-<thead><tr><th scope="col">${t('col.option')}</th><th scope="col">${t('col.price')}</th><th scope="col">${t('col.verdict')}</th>${detail ? html`<th scope="col" class="num">${t('col.dif')}</th><th scope="col" class="num">${t('col.vp')}</th>` : ''}</tr></thead>
-<tbody>${rows}</tbody>
-</table></section>
+${storeMeasured === undefined ? '' : html`<p class="store-meta note">${t('cell.measured', { date: fmt.dateTime(storeMeasured) })}</p>`}
+<ul class="offers" aria-label="${t('store.table', { store: name })}">${items}</ul>
 </section>`;
 }

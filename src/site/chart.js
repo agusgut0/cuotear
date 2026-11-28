@@ -100,7 +100,7 @@ const fixed = (value) => value.toFixed(1);
 function marker(style, x, y) {
   const shape = style % STYLE_COUNT;
   const cls = `mk s${shape}`;
-  if (shape === 0) return html`<circle class="${cls}" cx="${fixed(x)}" cy="${fixed(y)}" r="4" />`;
+  if (shape === 0) return html`<circle class="${cls}" cx="${fixed(x)}" cy="${fixed(y)}" r="4.5" />`;
   if (shape === 1) return html`<rect class="${cls}" x="${fixed(x - 4)}" y="${fixed(y - 4)}" width="8" height="8" />`;
   if (shape === 2) return html`<polygon class="${cls}" points="${fixed(x)},${fixed(y - 5.5)} ${fixed(x - 5)},${fixed(y + 4)} ${fixed(x + 5)},${fixed(y + 4)}" />`;
   return html`<polygon class="${cls}" points="${fixed(x)},${fixed(y - 5.5)} ${fixed(x + 5.5)},${fixed(y)} ${fixed(x)},${fixed(y + 5.5)} ${fixed(x - 5.5)},${fixed(y)}" />`;
